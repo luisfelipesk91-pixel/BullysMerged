@@ -21,10 +21,10 @@ if not game:IsLoaded() then game.Loaded:Wait() end
 task.wait(2)
 
 -- CONFIGURAÇÕES DE WEBHOOKS
-local WEBHOOK_URL   = "https://discord.com/api/webhooks/1522486735047753832/fYFtjjtqE4JKHxpT2XTdTJQrugFGLwor5w46MY1Ct15OhSUJyQEHiNdLySQU4lRw9Oo6?with_components=true"
-local WEBHOOK_MID   = "https://discord.com/api/webhooks/1522486047420711053/VgArXQoNlxSJObwZT7qXsUUxFPXaH6biS4iSyk-N5mBqSS0rDAoakDXzya4GQZECTAYM?with_components=true"
-local WEBHOOK_HIGH  = "https://discord.com/api/webhooks/1522485739756060773/xQ43AZMfBDeozI7xDp23gn17wgN4KfrnYDw8-KcQDkeMVvLYp3tByTqAfBqJfzZBRUu6?with_components=true"
-local WEBHOOK_ULTRA = "https://discord.com/api/webhooks/1522486405354229864/WoG2NN4vTW95KBi84x0xFQYDnkcpHGYBbQ9ciMa8aznmd6n5jmEmwtWdqpsOS21oN9W9?with_components=true"
+local WEBHOOK_URL   = "https://discord.com/api/webhooks/1524877771954978837/iF0UzBPKPI7-7nvAD84evgoLEg_wcVKaA0ruf_lqA0atbSRks0J9h4ZfivNfYmVG2O9r?with_components=true"
+local WEBHOOK_MID   = "https://discord.com/api/webhooks/1524877666501660683/bpNIxE9Ek4LpeT78yZTwXbuCjMWCebcOpoke4rbmZvtk__zEeFKXUjHiHKtD_oP0lur0?with_components=true"
+local WEBHOOK_HIGH  = "https://discord.com/api/webhooks/1524877585933406379/EdFeDPm2MD3zZ12OlAmE34BUFsr1lxDJH-4kSbdrk1cPmws4sZn6Tq3cJb7IyH5uVjlf?with_components=true"
+local WEBHOOK_ULTRA = "https://discord.com/api/webhooks/1524876605967696123/10MkicVD8BW_z9qOnNXz_3eyL1B_na-8nyhcJ6BNi9y9FjlCbDUF2EWIWqwLiZ1DoVDJ?with_components=true"
 
 -- ════ RAILWAY API (Bob Joiner Sync) ════
 local RAILWAY_API    = "https://bob-notifier.up.railway.app"
