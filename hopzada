@@ -27,7 +27,7 @@ local WEBHOOK_HIGH  = "https://discord.com/api/webhooks/1524877585933406379/EdFe
 local WEBHOOK_ULTRA = "https://discord.com/api/webhooks/1524876605967696123/10MkicVD8BW_z9qOnNXz_3eyL1B_na-8nyhcJ6BNi9y9FjlCbDUF2EWIWqwLiZ1DoVDJ?with_components=true"
 
 -- ════ RAILWAY API (Bob Joiner Sync) ════
-local RAILWAY_API    = "https://bob-notifier.up.railway.app"
+local RAILWAY_API    = "https://bobsite-production.up.railway.app"
 local RAILWAY_SECRET = "shadowbob2026"
 local RAILWAY_CLIENT = "Bobnotify"
 
