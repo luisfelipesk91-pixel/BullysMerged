@@ -4,10 +4,16 @@ local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local RS = game:GetService("ReplicatedStorage")
-local CoreGui = (gethui and gethui()) or game:GetService("CoreGui")
+
+-- ✅ FIX: Garante que CoreGui seja uma Instance válida
+local CoreGui = gethui and gethui() or game:GetService("CoreGui")
+if not CoreGui or typeof(CoreGui) ~= "Instance" then
+    CoreGui = game:GetService("CoreGui")
+end
 
 -- PRÉ-CARREGAMENTO DO SOM (MESMO DO JOINER)
-local BEEP_SOUND = Instance.new("Sound", CoreGui)
+local BEEP_SOUND = Instance.new("Sound")
+BEEP_SOUND.Parent = CoreGui
 BEEP_SOUND.SoundId = "rbxassetid://101314628073587"
 BEEP_SOUND.Volume = 1
 BEEP_SOUND.PlayOnRemove = false
