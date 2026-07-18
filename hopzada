@@ -593,7 +593,9 @@ local function startInfiniteHop(label)
 
             local availableServers = {}
             for _, server in ipairs(result.data) do
-                if server.id ~= game.JobId and not currentVisited[server.id] and server.playing < server.maxPlayers then
+                                local playing = server.playing or 0
+                local maxPlayers = server.maxPlayers or 0
+                if server.id ~= game.JobId and not currentVisited[server.id] and playing < maxPlayers then
                     table.insert(availableServers, server)
                 end
             end
