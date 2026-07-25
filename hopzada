@@ -41,13 +41,13 @@ local RAILWAY_CLIENT = "Bobnotify"
 local TARGET_NAMES   = {""}
 local ULTRA_BRAINROTS = {"Dragon Cannelloni", "Pineaplino", "Caramello Filtrello", "Avocadorilla", "Tob Tobi Tobi", "Bearito Cabinito", "Venuspino", "Festive 67", "Gorillo Subwoofero", "Cerberus", "Centrucci Nuclucci", "Rhino Helicopterino", "La Casa Boo", "Ganganzelli Trulala", "Strawberry Elephant", "Headless Horseman", "Skibidi Toilet", "Meowl", "Griffin", "Dragon Gingerini", "Hydra Dragon Cannelloni", "Ice Dragon", "Love Love Bear", "Digi Narwhal", "La Supreme Combinasion", "Hydra Bunny", "Bunny and Eggy", "Rosey and Teddy", "Cooki and Milki", "Arcadragon", "Ketupat Bros", "Reinito Sleghito", "Fortunu and Cashuru", "Los Amigos", "Pancake and Syrup", "Foxini Larternini", "Kalika Bros", "Los Sekolahs", "Signore Carapace", "Fragrama and Chocrama", "Cash or Card", "La Casa Boo", "La Food Combinasion", "Elefanto Frigo", "Spooky and Pumpky", "Boppin Bunny", "Ginger Gerat", "Los Chillis", "Sammyni Fattini", "Los Spaghettis", "Festive 67", "Quackini Snackini", "Antonio", "Hopilikalika Hopilikalako", "Fishino Clownino", "Jolly Jolly Sahur", "Tirilikaliko Tirilikalako", "Lovin Rose", "Fragola La La La", "Los Tacoritas", "Dragon Aquanini", "Tirilikalika Tirilikalako", "Jelly Moby", "Duggy Bros", "Sammyni Cakini", "Los Hackers", "Rubrikiko", "Rico Dinero", "Money Money Bros", "Dug Dug Dug", "Globa Steppa", "Caramelo Filtrello", "Gorilo Subwoofero", "Kraken"}
 local BLACK_NAMES    = {"Fishboard", "Chicleteira Bicicleteira", "Octoball", "Aquarino", "Lucky Block", "Los Taco Blocks", "To to to Sahur", "Graipuss Medussi", "Bunny Bunny Bunny Sahur", "Serafinna Medusella", "Chicleteirina Bicicleteirina", "Santa Hotspot", "Cupid Hotspot", "Los Quesadillas", "Naughty Naughty", "Flancito", "Capitano Gullini", "La Vacca Lepre Lepreino", "Quesadilla Crocodilla", "Easter Easter Easter Sahur", "Bombardiro Vaccariro", "Burrito Bandito", "Los Nooo My Hotspotsitos"}
-local MIN_VALUE        = 20000000
-local MIN_VALUE_CARPET = 20000000
+local MIN_VALUE        = 25000000
+local MIN_VALUE_CARPET = 25000000
 local NOTIFIER_NAME = "bob"
 local CURRENT_JOB   = tostring(game.JobId)
 local PLACE_ID      = game.PlaceId
 local LocalPlayer = Players.LocalPlayer
-print("Players: " .. tostring(#Players:GetPlayers()))
+    -- print("Players: " .. tostring(#Players:GetPlayers()))
 
 local http_request = http_request or (syn and syn.request) or (http and http.request) or request
 
@@ -138,7 +138,6 @@ local TRAIT_EMOJIS = {
     ["Burger"]="<:Burger:1518450900413452380>",
 }
 
-local Synchronizer  = nil
 local AnimalsData   = nil
 local AnimalsShared = nil
 do
@@ -148,10 +147,8 @@ do
         end)
         return ok and result or nil
     end
-    local ok_pkg, Packages = pcall(function() return RS:WaitForChild("Packages", 5) end)
     local ok_dat, Datas    = pcall(function() return RS:WaitForChild("Datas", 5) end)
     local ok_sh,  Shared   = pcall(function() return RS:WaitForChild("Shared", 5) end)
-    if ok_pkg and Packages then Synchronizer  = tryLoad(Packages, "Synchronizer") end
     if ok_dat and Datas    then AnimalsData   = tryLoad(Datas,    "Animals")      end
     if ok_sh  and Shared   then AnimalsShared = tryLoad(Shared,   "Animals")      end
 end
@@ -300,80 +297,92 @@ local function scanPlots(duelPlayers, seen, currentJobId)
     local results = {}
     local plots = Workspace:FindFirstChild("Plots")
     if not plots then return results end
+    
     for _, plot in ipairs(plots:GetChildren()) do
-        local ok, pot = pcall(function() return Synchronizer:Get(plot.Name) end)
-        if not ok or not pot then continue end
-        local ok2, list = pcall(function() return pot:Get("AnimalList") end)
-        if not ok2 or type(list) ~= "table" then continue end
-        local syncOwner = nil
-        local ownerOk, ownerVal = pcall(function() return pot:Get("Owner") end)
-        if ownerOk and ownerVal ~= nil then
-            syncOwner = type(ownerVal) == "string" and ownerVal or tostring(ownerVal)
-        end
-        local plotDuel = false
-        if syncOwner and duelPlayers[syncOwner] then plotDuel = true
-        else plotDuel = isPlotOwnerInDuel(plot, duelPlayers) end
-        local ownerName = syncOwner or resolveOwnerName(ownerVal) or "?"
-        local plotItems = {}
+        local ownerName = plot:GetAttribute("Owner") or plot:GetAttribute("PlayerName") or plot.Name
+        local plotDuel = isPlotOwnerInDuel(plot, duelPlayers)
+        local plotResults = {}
         local plotHasQualifying = false
-        for _, animalData in pairs(list) do
-            if type(animalData) ~= "table" then continue end
-            if isFusing(animalData) then continue end
-            local name = animalData.Index
-            if not name then continue end
-            if not AnimalsData or not AnimalsData[name] then continue end
-            local inDuel = isInDuel(animalData) or plotDuel
-            local data = animalData.Data or animalData
-            local mutation = data.Mutation
-            if type(mutation) ~= "string" or mutation == "" then mutation = nil end
-            local traitsTable = nil
-            local traitsList = {}
-            if type(data.Traits) == "table" then
-                traitsTable = {}
-                if #data.Traits > 0 then
-                    for _, trait in ipairs(data.Traits) do
-                        if type(trait) == "string" then
-                            table.insert(traitsTable, trait)
-                            table.insert(traitsList, trait)
-                        end
-                    end
-                else
-                    for traitName, enabled in pairs(data.Traits) do
-                        if enabled then
-                            table.insert(traitsTable, traitName)
-                            table.insert(traitsList, traitName)
+
+        -- MÉTODO 1: Atributos/Dados Internos (Mais preciso se funcionar)
+        local list = plot:GetAttribute("AnimalList") or plot:FindFirstChild("AnimalList") and plot:FindFirstChild("AnimalList").Value
+        if list and type(list) == "table" then
+            for _, animalData in pairs(list) do
+                if type(animalData) ~= "table" or isFusing(animalData) then continue end
+                local name = animalData.Index
+                if not name or not AnimalsData or not AnimalsData[name] then continue end
+                
+                local inDuel = isInDuel(animalData) or plotDuel
+                local data = animalData.Data or animalData
+                local mutation = data.Mutation
+                local traitsTable = nil
+                local traitsList = {}
+                
+                if type(data.Traits) == "table" then
+                    traitsTable = {}
+                    for k, v in pairs(data.Traits) do
+                        local tName = type(k) == "string" and k or v
+                        if v == true or type(k) == "number" then
+                            table.insert(traitsTable, tName)
+                            table.insert(traitsList, tName)
                         end
                     end
                 end
-                if #traitsTable == 0 then traitsTable = nil end
+
+                local ok, genValue = pcall(function() return AnimalsShared:GetGeneration(name, mutation, traitsTable, nil) end)
+                if ok and type(genValue) == "number" and shouldScan(name, genValue) then
+                    plotHasQualifying = true
+                    local displayName = AnimalsData[name].DisplayName or name
+                    table.insert(plotResults, {
+                        tier = (genValue >= 1e9 or isUltra(displayName)) and "ULTRA" or (genValue >= 100e6) and "HIGH" or "MID",
+                        name = displayName, gen = "$" .. formatValue(genValue) .. "/s", value = genValue,
+                        mutation = mutation, traits = #traitsList > 0 and traitsList or nil,
+                        inDuel = inDuel, ownerName = ownerName,
+                        isCarpet = false
+                    })
+                end
             end
-            local ok3, genValue = pcall(function()
-                return AnimalsShared:GetGeneration(name, mutation, traitsTable, nil)
-            end)
-            if not ok3 or type(genValue) ~= "number" then continue end
-            local qualifies = shouldScan(name, genValue)
-            if qualifies then plotHasQualifying = true end
-            local displayName = name
-            local info = AnimalsData[name]
-            if info and info.DisplayName then displayName = info.DisplayName end
-            table.insert(plotItems, {
-                name = displayName, index = name, genValue = genValue,
-                mutation = mutation, traitsList = traitsList,
-                traitCount = traitsTable and #traitsTable or 0,
-                inDuel = inDuel, qualifies = qualifies, ownerName = ownerName,
-            })
         end
-        if not plotHasQualifying then continue end
-        for _, item in ipairs(plotItems) do
-            if not item.qualifies then continue end
-            local genText = "$" .. formatValue(item.genValue) .. "/s"
-            table.insert(results, {
-                tier = (item.genValue >= 1e9 or isUltra(item.name)) and "ULTRA" or (item.genValue >= 100e6) and "HIGH" or "MID",
-                name = item.name, gen = genText, value = item.genValue,
-                mutation = item.mutation, traits = #item.traitsList > 0 and item.traitsList or nil,
-                inDuel = item.inDuel, ownerName = item.ownerName,
-            })
-            print(string.format("FOUND: %s | Mutation: %s | Traits: %d | Gen: %s", item.name, item.mutation or "None", item.traitCount, genText))
+
+        -- MÉTODO 2: Scan Visual no Plot (Caso os dados internos falhem ou estejam incompletos)
+        for _, obj in ipairs(plot:GetDescendants()) do
+            local textToParse = ""
+            if (obj:IsA("TextLabel") or obj:IsA("TextButton")) then textToParse = obj.Text
+            elseif obj:IsA("ProximityPrompt") then textToParse = obj.ObjectText end
+
+            if textToParse ~= "" and textToParse:find("/s") then
+                local dName, gVal = parseObjectText(textToParse)
+                if dName == "Unknown" and obj.Parent then
+                    for _, sib in ipairs(obj.Parent:GetChildren()) do
+                        local sibText = (sib:IsA("TextLabel") or sib:IsA("TextButton")) and sib.Text or (sib:IsA("ProximityPrompt") and sib.ObjectText) or ""
+                        if sibText ~= "" and sib ~= obj then
+                            local sn, _ = parseObjectText(sibText)
+                            if sn ~= "Unknown" then dName = sn; break end
+                        end
+                    end
+                end
+
+                if dName ~= "Unknown" and shouldScan(dName, gVal) then
+                    -- Evita duplicatas se já pegou pelo Método 1
+                    local alreadyFound = false
+                    for _, r in ipairs(plotResults) do if r.name == dName and math.abs(r.value - gVal) < 10 then alreadyFound = true; break end end
+                    
+                    if not alreadyFound then
+                        plotHasQualifying = true
+                        table.insert(plotResults, {
+                            tier = (gVal >= 1e9 or isUltra(dName)) and "ULTRA" or (gVal >= 100e6) and "HIGH" or "MID",
+                            name = dName, gen = "$" .. formatValue(gVal) .. "/s", value = gVal,
+                            mutation = nil, traits = nil, inDuel = plotDuel, ownerName = ownerName,
+                            isCarpet = false
+                        })
+                    end
+                end
+            end
+        end
+
+        for _, r in ipairs(plotResults) do 
+            table.insert(results, r) 
+            print(string.format("PLOT FOUND: %s | Owner: %s | Gen: %s", r.name, r.ownerName, r.gen))
         end
     end
     return results
@@ -381,34 +390,139 @@ end
 
 local function parseObjectText(objectText)
     if not objectText or objectText == "" then return nil, 0 end
-    local name, valStr = objectText:match("^(.-)%s*%$([%d%.]+[KkMmBbTt]?)%s*$")
-    if name and valStr then
-        name = name:match("^%s*(.-)%s*$")
-        return name, parseValue("$" .. valStr .. "/s")
+    
+    -- Remove tags de RichText (ex: <font color="...">)
+    local cleanText = objectText:gsub("<[^>]+>", "")
+    -- Limpa caracteres especiais invisíveis
+    cleanText = cleanText:gsub("[\128-\255]", "")
+    
+    local lines = cleanText:split("\n")
+    local name = "Unknown"
+    local genValue = 0
+    
+    for _, line in ipairs(lines) do
+        local trimmed = line:match("^%s*(.-)%s*$")
+        if trimmed ~= "" then
+            -- Procura valor /s
+            local genStr = trimmed:match("%$([%d%.]+[KkMmBbTt]?)/[Ss]")
+            if genStr then
+                genValue = parseValue("$" .. genStr .. "/s")
+            -- Se não for valor nem preço, assume que é o nome (se ainda não tiver um)
+            elseif name == "Unknown" and not trimmed:find("%$") and not trimmed:find("/") and #trimmed > 2 then
+                name = trimmed
+            end
+        end
     end
-    return objectText:match("^%s*(.-)%s*$"), 0
+    
+    return name, genValue
+end
+
+local function getPlotAtPosition(pos)
+    local plots = Workspace:FindFirstChild("Plots")
+    if not plots then return nil end
+    for _, plot in ipairs(plots:GetChildren()) do
+        local base = plot:FindFirstChild("Base") or plot:FindFirstChild("Hitbox") or plot:FindFirstChild("Floor")
+        if base and base:IsA("BasePart") then
+            local p = base.Position
+            local s = base.Size
+            -- Aumentado para +15 para garantir detecção em bordas e Debris
+            if math.abs(pos.X - p.X) <= s.X/2 + 15 and math.abs(pos.Z - p.Z) <= s.Z/2 + 15 then
+                return plot
+            end
+        end
+    end
+    -- Fallback: Se não achou pela base, tenta por distância do centro do plot
+    for _, plot in ipairs(plots:GetChildren()) do
+        local center = plot:FindFirstChild("Base") or plot:FindFirstChild("Hitbox") or plot:FindFirstChild("Spawn")
+        if center and center:IsA("BasePart") then
+            local dist = (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(center.Position.X, 0, center.Position.Z)).Magnitude
+            if dist < 60 then return plot end
+        end
+    end
+    return nil
 end
 
 local function scanCarpet(seen, currentJobId)
     local results = {}
+    local searched = 0
+    local plotsFolder = Workspace:FindFirstChild("Plots")
+    
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        if not obj:IsA("ProximityPrompt") or not obj.Enabled then continue end
-        if (obj.ActionText or "") ~= "Purchase" then continue end
-        local displayName, genValue = parseObjectText(obj.ObjectText)
-        if not displayName or displayName == "" then continue end
-        if AnimalsData and AnimalsShared and AnimalsData[displayName] then
-            local ok, v = pcall(function() return AnimalsShared:GetGeneration(displayName, nil, nil, nil) end)
-            if ok and type(v) == "number" and v > 0 then genValue = v end
+        if plotsFolder and obj:IsDescendantOf(plotsFolder) then continue end
+        
+        local textToParse = ""
+        local isMatch = false
+        if obj:IsA("ProximityPrompt") and obj.Enabled and (obj.ActionText == "Purchase" or obj.ActionText == "") then
+            textToParse = obj.ObjectText
+            isMatch = true
+        elseif obj:IsA("TextLabel") or obj:IsA("TextButton") then
+            textToParse = obj.Text
+            if textToParse:find("/s") then isMatch = true end
         end
-        if isBlacklisted(displayName) then continue end
-        if not (genValue >= MIN_VALUE_CARPET or isTargeted(displayName) or isUltra(displayName)) then continue end
-        local genText = genValue > 0 and ("$" .. formatValue(genValue) .. "/s") or "?"
-        table.insert(results, {
-            tier = (genValue >= 1e9 or isUltra(displayName)) and "ULTRA" or (genValue >= 100e6) and "HIGH" or "MID",
-            name = displayName .. " (carpet)", gen = genText, value = genValue,
-            mutation = nil, traits = nil, inDuel = false, ownerName = "Carpet", isCarpet = true,
-        })
-        print(string.format("✅ CARPET FOUND: %s | Gen: %s", displayName, genText))
+        
+        if isMatch and textToParse ~= "" then
+            searched = searched + 1
+            local currentDisplayName, genValueFromText = parseObjectText(textToParse)
+            local finalDisplayName = currentDisplayName
+
+            if finalDisplayName == "Unknown" and obj.Parent then
+                for _, sibling in ipairs(obj.Parent:GetChildren()) do
+                    if (sibling:IsA("TextLabel") or sibling:IsA("TextButton") or sibling:IsA("ProximityPrompt")) and sibling ~= obj then
+                        local siblingName, _ = parseObjectText(sibling.Text or sibling.ObjectText)
+                        if siblingName and siblingName ~= "Unknown" and not siblingName:find("%$") and not siblingName:find("/") then
+                            finalDisplayName = siblingName
+                            break
+                        end
+                    end
+                end
+            end
+
+            if finalDisplayName and finalDisplayName ~= "" and not isBlacklisted(finalDisplayName) then
+                local genValue = genValueFromText
+                if genValue == 0 and AnimalsData and AnimalsShared and AnimalsData[finalDisplayName] then
+                    local ok, v = pcall(function() return AnimalsShared:GetGeneration(finalDisplayName, nil, nil, nil) end)
+                    if ok and type(v) == "number" and v > 0 then genValue = v end
+                end
+                
+                if genValue >= MIN_VALUE_CARPET or isTargeted(finalDisplayName) or isUltra(finalDisplayName) then
+                    local genText = "$" .. formatValue(genValue) .. "/s"
+                    
+                    -- LÓGICA DE DETECÇÃO DE DONO POR POSIÇÃO (PARA ITENS EM DEBRIS)
+                    local ownerName = "Carpet"
+                    local isCarpet = true
+                    
+                    -- Tenta pegar a posição pelo Adornee (BillboardGui/SurfaceGui) ou pelo objeto físico
+                    local pos = nil
+                    if obj:IsA("GuiObject") or obj:IsA("LayerCollector") then
+                        local root = obj:FindFirstAncestorWhichIsA("BillboardGui") or obj:FindFirstAncestorWhichIsA("SurfaceGui")
+                        if root and root.Adornee then pos = root.Adornee.Position end
+                    end
+                    
+                    if not pos then
+                        pos = (obj:IsA("BasePart") and obj.Position) or (obj.Parent:IsA("BasePart") and obj.Parent.Position)
+                    end
+                    
+                    if not pos and obj:FindFirstAncestorWhichIsA("BasePart") then
+                        pos = obj:FindFirstAncestorWhichIsA("BasePart").Position
+                    end
+                    
+                    if pos then
+                        local plot = getPlotAtPosition(pos)
+                        if plot then
+                            ownerName = plot:GetAttribute("Owner") or plot:GetAttribute("PlayerName") or plot.Name
+                            isCarpet = false
+                        end
+                    end
+
+                    table.insert(results, {
+                        tier = (genValue >= 1e9 or isUltra(finalDisplayName)) and "ULTRA" or (genValue >= 100e6) and "HIGH" or "MID",
+                        name = finalDisplayName, gen = genText, value = genValue,
+                        mutation = nil, traits = nil, inDuel = false, ownerName = ownerName, isCarpet = isCarpet,
+                    })
+                    print(string.format("✅ %s FOUND: %s | Owner: %s | Gen: %s", isCarpet and "CARPET" or "PLOT", finalDisplayName, ownerName, genText))
+                end
+            end
+        end
     end
     return results
 end
@@ -429,7 +543,7 @@ local function getBrainrotImage(name)
     return ok and result or nil
 end
 
-local function sendWebhook(url, name, value, mutation, allResults, showFields, footer, ownerName, jobId, includeJoinLink, inDuel)
+local function sendWebhook(url, name, value, mutation, allResults, showFields, footer, jobId, includeJoinLink, inDuel, isCarpet)
     if not url or url == "" then return end
     local imageUrl = getBrainrotImage(name)
     local joinLink = "https://liphyrdev.github.io/notifier/?placeId=109983668079237&gameInstanceId=" .. (jobId or CURRENT_JOB)
@@ -488,7 +602,7 @@ end
             { type = 10, content = "## Bob Notifier・" .. notifierType },
             { type = 14, divider = true, spacing = 1 },
             { type = 9, accessory = imageUrl and { type = 11, media = { url = imageUrl } } or nil,
-                components = {{ type = 10, content = "# " .. mutEmoji .. "・" .. name .. "\n" .. (traitsText ~= "" and (traitsText .. "\n") or "") .. "### " .. genText }}
+                components = {            { type = 10, content = "# " .. mutEmoji .. "・" .. name .. (isCarpet and " (carpet)" or "") .. "\n" .. (traitsText ~= "" and (traitsText .. "\n") or "") .. "### " .. genText }}
             }
         }
     }}
@@ -508,23 +622,24 @@ end
     table.insert(components[1].components, { type = 14, divider = true, spacing = 1 })
     table.insert(components[1].components, { type = 10, content = footerText })
 
-    pcall(function()
+    local success, err = pcall(function()
         http_request({
             Url = url, Method = "POST", Headers = { ["Content-Type"] = "application/json" },
             Body = HttpService:JSONEncode({ username = NOTIFIER_NAME, flags = 32768, components = components })
         })
     end)
+    if not success then
+        print("⚠️ Erro ao enviar webhook para " .. url .. ": " .. tostring(err))
+    end
 end
 
-local function sendToRailwayAPI(name, jobId, genText, value, key, ownerName, currentPlayers, maxPlayers, placeId)
+local function sendToRailwayAPI(name, jobId, genText, value, key, placeId)
     local body = HttpService:JSONEncode({
         brainrot = name, 
         name = name, 
         jobId = tostring(jobId or ""),
         value = tostring(math.floor(value or 0)), 
-        owner = tostring(ownerName or "Unknown"),
-        players = tostring(currentPlayers or "?"),
-        maxPlayers = tostring(maxPlayers or "?"),
+
         placeId = tostring(placeId or "109983668079237")
     })
     pcall(function()
@@ -659,7 +774,7 @@ task.wait(2)
 local detectedJobId = game.JobId
 local found = false
 
-if Synchronizer then
+
     local duelPlayers = getDuelPlayers()
     local seen = {}
     local results = scanPlots(duelPlayers, seen, detectedJobId)
@@ -669,7 +784,7 @@ if Synchronizer then
 
     if type(results) == "table" and #results > 0 then
         found = true
-        
+        playBeep()
         -- SISTEMA DE PRIORIDADE BOB (ULTRA > VALUE)
         -- Primeiro, tentamos encontrar o melhor item ULTRA na lista
         local bestUltra = nil
@@ -694,26 +809,28 @@ if Synchronizer then
         local best = bestUltra or results[1]
         
         if best then
-            sendWebhook(WEBHOOK_URL, best.name, best.value, best.mutation, results, true, "Bob Notify", best.ownerName, detectedJobId, true, best.inDuel)
+            local nameClean = best.name:gsub("%s*%(carpet%)%s*$", "")
+            local finalName = nameClean
+            if best.isCarpet then finalName = nameClean .. " (carpet)" end
+            
+            sendWebhook(WEBHOOK_URL, finalName, best.value, best.mutation, results, true, "Bob Notify", detectedJobId, true, best.inDuel, best.isCarpet)
             
             local isUltraName = false
-            local bestNameClean = best.name:gsub("%s*%(carpet%)%s*$", ""):lower()
-            for _, u in ipairs(ULTRA_BRAINROTS) do if u ~= "" and bestNameClean == u:lower() then isUltraName = true; break end end
-            
+            for _, u in ipairs(ULTRA_BRAINROTS) do if u ~= "" and nameClean:lower() == u:lower() then isUltraName = true; break end end
+
             if best.value >= 1e9 or isUltraName then 
-                sendWebhook(WEBHOOK_ULTRA, best.name, best.value, best.mutation, results, false, "Ultra", best.ownerName, detectedJobId, false, best.inDuel)
+                sendWebhook(WEBHOOK_ULTRA, finalName, best.value, best.mutation, results, false, "Ultra", detectedJobId, false, best.inDuel, best.isCarpet)
             elseif best.value >= 100e6 then 
-                sendWebhook(WEBHOOK_HIGH, best.name, best.value, best.mutation, results, false, "High", best.ownerName, detectedJobId, false, best.inDuel)
+                sendWebhook(WEBHOOK_HIGH, finalName, best.value, best.mutation, results, false, "High", detectedJobId, false, best.inDuel, best.isCarpet)
             else 
-                sendWebhook(WEBHOOK_MID, best.name, best.value, best.mutation, results, false, "Mid", best.ownerName, detectedJobId, false, best.inDuel) 
+                sendWebhook(WEBHOOK_MID, finalName, best.value, best.mutation, results, false, "Mid", detectedJobId, false, best.inDuel, best.isCarpet) 
             end
             
-            sendToRailwayAPI(best.name, detectedJobId, best.gen, best.value, getUserKey(), best.ownerName, #Players:GetPlayers(), Players.MaxPlayers, PLACE_ID)
-            print("✅ Sucesso:", best.name, "| Owner:", best.ownerName, "|", best.gen)
+            sendToRailwayAPI(best.name, detectedJobId, best.gen, best.value, getUserKey(), PLACE_ID)
+            print(string.format("✅ Sucesso: %s %s | %s", best.name, best.isCarpet and "(carpet)" or "(plot)", best.gen))
             startInfiniteHop(best.name)
         end
     end
-end
 
 if not found then print("❌ Nenhum brainrot valioso encontrado"); startInfiniteHop("Scan") end
 print("🚀 Sistema de Hop Infinito ativado!")
