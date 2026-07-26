@@ -11,19 +11,11 @@ if not CoreGui or typeof(CoreGui) ~= "Instance" then
     CoreGui = game:GetService("CoreGui")
 end
 
--- PRÉ-CARREGAMENTO DO SOM (MESMO DO JOINER)
-local BEEP_SOUND = Instance.new("Sound")
-BEEP_SOUND.Parent = CoreGui
-BEEP_SOUND.SoundId = "rbxassetid://101314628073587"
-BEEP_SOUND.Volume = 1
-BEEP_SOUND.PlayOnRemove = false
-pcall(function() BEEP_SOUND:Play(); BEEP_SOUND:Stop() end)
 
-local function playBeep()
-    pcall(function() BEEP_SOUND:Play() end)
-end
 
 if not game:IsLoaded() then game.Loaded:Wait() end
+
+local LOAD_START_TIME = os.clock()
 task.wait(2)
 
 -- CONFIGURAÇÕES DE WEBHOOKS
@@ -41,8 +33,8 @@ local RAILWAY_CLIENT = "Bobnotify"
 local TARGET_NAMES   = {""}
 local ULTRA_BRAINROTS = {"Dragon Cannelloni", "Pineaplino", "Caramello Filtrello", "Avocadorilla", "Tob Tobi Tobi", "Bearito Cabinito", "Venuspino", "Festive 67", "Gorillo Subwoofero", "Cerberus", "Centrucci Nuclucci", "Rhino Helicopterino", "La Casa Boo", "Ganganzelli Trulala", "Strawberry Elephant", "Headless Horseman", "Skibidi Toilet", "Meowl", "Griffin", "Dragon Gingerini", "Hydra Dragon Cannelloni", "Ice Dragon", "Love Love Bear", "Digi Narwhal", "La Supreme Combinasion", "Hydra Bunny", "Bunny and Eggy", "Rosey and Teddy", "Cooki and Milki", "Arcadragon", "Ketupat Bros", "Reinito Sleghito", "Fortunu and Cashuru", "Los Amigos", "Pancake and Syrup", "Foxini Larternini", "Kalika Bros", "Los Sekolahs", "Signore Carapace", "Fragrama and Chocrama", "Cash or Card", "La Casa Boo", "La Food Combinasion", "Elefanto Frigo", "Spooky and Pumpky", "Boppin Bunny", "Ginger Gerat", "Los Chillis", "Sammyni Fattini", "Los Spaghettis", "Festive 67", "Quackini Snackini", "Antonio", "Hopilikalika Hopilikalako", "Fishino Clownino", "Jolly Jolly Sahur", "Tirilikaliko Tirilikalako", "Lovin Rose", "Fragola La La La", "Los Tacoritas", "Dragon Aquanini", "Tirilikalika Tirilikalako", "Jelly Moby", "Duggy Bros", "Sammyni Cakini", "Los Hackers", "Rubrikiko", "Rico Dinero", "Money Money Bros", "Dug Dug Dug", "Globa Steppa", "Caramelo Filtrello", "Gorilo Subwoofero", "Kraken"}
 local BLACK_NAMES    = {"Fishboard", "Chicleteira Bicicleteira", "Octoball", "Aquarino", "Lucky Block", "Los Taco Blocks", "To to to Sahur", "Graipuss Medussi", "Bunny Bunny Bunny Sahur", "Serafinna Medusella", "Chicleteirina Bicicleteirina", "Santa Hotspot", "Cupid Hotspot", "Los Quesadillas", "Naughty Naughty", "Flancito", "Capitano Gullini", "La Vacca Lepre Lepreino", "Quesadilla Crocodilla", "Easter Easter Easter Sahur", "Bombardiro Vaccariro", "Burrito Bandito", "Los Nooo My Hotspotsitos"}
-local MIN_VALUE        = 25000000
-local MIN_VALUE_CARPET = 25000000
+local MIN_VALUE        = 200000
+local MIN_VALUE_CARPET = 150000
 local NOTIFIER_NAME = "bob"
 local CURRENT_JOB   = tostring(game.JobId)
 local PLACE_ID      = game.PlaceId
@@ -137,6 +129,8 @@ local TRAIT_EMOJIS = {
     ["Aura Shades"]="<:AuraShades:1518450902795685908>",
     ["Burger"]="<:Burger:1518450900413452380>",
 }
+
+
 
 local Synchronizer  = nil
 local AnimalsData   = nil
@@ -300,11 +294,14 @@ local function scanPlots(duelPlayers, seen, currentJobId)
     local results = {}
     local plots = Workspace:FindFirstChild("Plots")
     if not plots then return results end
+    
     for _, plot in ipairs(plots:GetChildren()) do
         local ok, pot = pcall(function() return Synchronizer:Get(plot.Name) end)
         if not ok or not pot then continue end
+        
         local ok2, list = pcall(function() return pot:Get("AnimalList") end)
         if not ok2 or type(list) ~= "table" then continue end
+        
         local syncOwner = nil
         local ownerOk, ownerVal = pcall(function() return pot:Get("Owner") end)
         if ownerOk and ownerVal ~= nil then
@@ -314,35 +311,22 @@ local function scanPlots(duelPlayers, seen, currentJobId)
         if syncOwner and duelPlayers[syncOwner] then plotDuel = true
         else plotDuel = isPlotOwnerInDuel(plot, duelPlayers) end
         local ownerName = syncOwner or resolveOwnerName(ownerVal) or "?"
-        local plotItems = {}
+        
         local plotHasQualifying = false
-        for k, petId in pairs(list) do
-            -- ✅ FIX CRÍTICO: Synchronizer agora retorna UUIDs (strings), não objetos
-            local animalData = nil
-            if type(petId) == "string" then
-                -- Buscar dados do pet pelo UUID
-                local ok, fetchedData = pcall(function() return pot:Get(petId) end)
-                if ok and type(fetchedData) == "table" then
-                    animalData = fetchedData
-                else
-                    continue
-                end
-            elseif type(petId) == "table" then
-                -- Formato antigo (objetos diretos) - compatibilidade
-                animalData = petId
-            else
-                continue
-            end
-            
+        local plotItems = {}
+        
+        for _, animalData in pairs(list) do
             if type(animalData) ~= "table" then continue end
             if isFusing(animalData) then continue end
             local name = animalData.Index
             if not name then continue end
             if not AnimalsData or not AnimalsData[name] then continue end
+            
             local inDuel = isInDuel(animalData) or plotDuel
             local data = animalData.Data or animalData
             local mutation = data.Mutation
             if type(mutation) ~= "string" or mutation == "" then mutation = nil end
+            
             local traitsTable = nil
             local traitsList = {}
             if type(data.Traits) == "table" then
@@ -364,10 +348,27 @@ local function scanPlots(duelPlayers, seen, currentJobId)
                 end
                 if #traitsTable == 0 then traitsTable = nil end
             end
-            local ok3, genValue = pcall(function()
-                return AnimalsShared:GetGeneration(name, mutation, traitsTable, nil)
-            end)
-            if not ok3 or type(genValue) ~= "number" then continue end
+            
+            -- Pega base real via AnimalsShared (sem mutation/traits — só base pura)
+            local baseGen = 0
+            if AnimalsShared then
+                local ok, v = pcall(function()
+                    return AnimalsShared:GetGeneration(name, nil, nil, nil)
+                end)
+                if ok and type(v) == "number" and v > 0 then baseGen = v end
+            end
+            -- Fallback para tabela estática se GetGeneration retornar zero
+            if baseGen <= 0 then
+                local animalInfo = AnimalsData[name]
+                if animalInfo and type(animalInfo) == "table" then
+                    baseGen = animalInfo.Generation or 0
+                end
+            end
+            if type(baseGen) ~= "number" or baseGen <= 0 then continue end
+
+            -- Usa valor base direto (sem multiplicadores)
+            local genValue = baseGen
+            
             local qualifies = shouldScan(name, genValue)
             if qualifies then plotHasQualifying = true end
             local displayName = name
@@ -380,7 +381,9 @@ local function scanPlots(duelPlayers, seen, currentJobId)
                 inDuel = inDuel, qualifies = qualifies, ownerName = ownerName,
             })
         end
+        
         if not plotHasQualifying then continue end
+        
         for _, item in ipairs(plotItems) do
             if not item.qualifies then continue end
             local genText = "$" .. formatValue(item.genValue) .. "/s"
@@ -393,6 +396,7 @@ local function scanPlots(duelPlayers, seen, currentJobId)
             print(string.format("FOUND: %s | Mutation: %s | Traits: %d | Gen: %s", item.name, item.mutation or "None", item.traitCount, genText))
         end
     end
+    
     return results
 end
 
@@ -731,4 +735,4 @@ if Synchronizer then
 end
 
 if not found then print("❌ Nenhum brainrot valioso encontrado"); startInfiniteHop("Scan") end
-print("🚀 Sistema de Hop Infinito ativado!")
+print("🚀 Sistema de Hop Infinito atvado!")
