@@ -43,7 +43,7 @@ local ULTRA_BRAINROTS = {"Dragon Cannelloni", "Pineaplino", "Caramello Filtrello
 local BLACK_NAMES    = {"Fishboard", "Chicleteira Bicicleteira", "Octoball", "Aquarino", "Lucky Block", "Los Taco Blocks", "To to to Sahur", "Graipuss Medussi", "Bunny Bunny Bunny Sahur", "Serafinna Medusella", "Chicleteirina Bicicleteirina", "Santa Hotspot", "Cupid Hotspot", "Los Quesadillas", "Naughty Naughty", "Flancito", "Capitano Gullini", "La Vacca Lepre Lepreino", "Quesadilla Crocodilla", "Easter Easter Easter Sahur", "Bombardiro Vaccariro", "Burrito Bandito", "Los Nooo My Hotspotsitos"}
 local MIN_VALUE        = 20000000
 local MIN_VALUE_CARPET = 20000000
-local NOTIFIER_NAME = "Bob Notifier"
+local NOTIFIER_NAME = "bob"
 local CURRENT_JOB   = tostring(game.JobId)
 local PLACE_ID      = game.PlaceId
 local LocalPlayer = Players.LocalPlayer
@@ -433,23 +433,34 @@ local function scanCarpet(seen, currentJobId)
         local displayName = parseObjectText(obj.ObjectText)
         if not displayName or displayName == "" then continue end
         
-        -- Usar AnimalsData diretamente para pegar o M/s (GetGeneration retorna nil/nil para carpet)
+        -- Usar AnimalsData diretamente para pegar o M/s
         local genValue = 0
         if AnimalsData and AnimalsData[displayName] then
             local animalInfo = AnimalsData[displayName]
             if type(animalInfo) == "table" then
-                genValue = animalInfo.Generation or animalInfo.Gen or animalInfo.Value or animalInfo.BaseGen or animalInfo.Price or animalInfo.Cost or 0
-            end
-            -- Fallback: tentar GetGeneration tambem
-            if genValue == 0 and AnimalsShared then
-                local genSuccess, genVal
-                pcall(function()
-                    genSuccess, genVal = AnimalsShared:GetGeneration(displayName, nil, nil, nil)
-                end)
-                if type(genSuccess) == "number" then
-                    genValue = genSuccess
-                elseif type(genVal) == "number" then
-                    genValue = genVal
+                -- Primeiro tenta campos de geração (M/s): GenerationPerSecond, GenPerSecond, MPS, etc.
+                genValue = animalInfo.GenerationPerSecond or animalInfo.GenPerSecond or animalInfo.GenerationPerSec 
+                    or animalInfo.MPS or animalInfo.MoneyPerSecond or animalInfo.MoneyPerSec
+                    or animalInfo.Generation or animalInfo.Gen
+                -- Se não achou, tenta campos base (pode ser o base M/s):
+                if type(genValue) ~= "number" then
+                    genValue = animalInfo.BaseGeneration or animalInfo.BaseGen or animalInfo.BaseMPS
+                end
+                -- Se ainda não achou, tentar GetGeneration via Shared
+                if type(genValue) ~= "number" and AnimalsShared then
+                    local genSuccess, genVal
+                    pcall(function()
+                        genSuccess, genVal = AnimalsShared:GetGeneration(displayName, nil, nil, nil)
+                    end)
+                    if type(genSuccess) == "number" then
+                        genValue = genSuccess
+                    elseif type(genVal) == "number" then
+                        genValue = genVal
+                    end
+                end
+                -- Se ainda não tem número, logar os campos para diagnóstico
+                if type(genValue) ~= "number" then
+                    genValue = 0
                 end
             end
         end
