@@ -14,7 +14,6 @@ end
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
-local LOAD_START_TIME = os.clock()
 task.wait(2)
 
 -- CONFIGURAÇÕES DE WEBHOOKS
@@ -312,9 +311,28 @@ local function scanPlots(duelPlayers, seen, currentJobId)
         local plotHasQualifying = false
         local plotItems = {}
         
-        for _, animalData in pairs(list) do
+        local animalCount = 0
+        for petIdOrData, animalData in pairs(list) do
+            animalCount = animalCount + 1
+            
+            -- Filtrar valores inválidos ANTES de processar
+            if type(animalData) == "string" and (animalData == "Empty" or animalData == "" or animalData == "nil") then
+                continue
+            end
+            
+            -- FIX UUID: Se animalData é string (UUID), buscar o pet
+            if type(animalData) == "string" then
+                local ok_pet, petData = pcall(function() return pot:Get(animalData) end)
+                if ok_pet and type(petData) == "table" then
+                    animalData = petData
+                else
+                    continue
+                end
+            end
+            
             if type(animalData) ~= "table" then continue end
             if isFusing(animalData) then continue end
+            
             local name = animalData.Index
             if not name then continue end
             if not AnimalsData or not AnimalsData[name] then continue end
@@ -346,13 +364,160 @@ local function scanPlots(duelPlayers, seen, currentJobId)
                 if #traitsTable == 0 then traitsTable = nil end
             end
             
-            -- Calcular valor usando AnimalsShared:GetGeneration que aplica multiplicadores automaticamente
-            local ok3, genValue = pcall(function()
-                return AnimalsShared:GetGeneration(name, mutation, traitsTable, nil)
-            end)
-            if not ok3 or type(genValue) ~= "number" or genValue <= 0 then continue end
+            -- Calcular valor usando fórmula: (Base × Mutation) + Trait1 + Trait2 + ...
+            local genValue = nil
+            local baseGen = nil
+            
+            -- Método 1: GetGenerationNoTraits (retorna $/s base SEM mutation)
+            local ok1, result1 = pcall(function() return AnimalsShared:GetGenerationNoTraits(name, nil) end)
+            if ok1 and type(result1) == "number" and result1 > 0 then 
+                baseGen = result1
+            end
+            
+            -- Fallback: Usar AnimalsData base
+            if not baseGen then
+                baseGen = AnimalsData[name].Generation
+                if not baseGen or type(baseGen) ~= "number" or baseGen <= 0 then
+                    continue
+                end
+            end
+            
+            -- FÓRMULA CORRETA: Base × (Mutation + (Trait1 + Trait2 + ...))
+            local mutationMod = 1
+            if mutation then
+                if mutation == "Gold" then mutationMod = 1.25
+                elseif mutation == "Diamond" then mutationMod = 1.5
+                elseif mutation == "Bloodrot" or mutation == "Blood Rot" then mutationMod = 2
+                elseif mutation == "Candy" then mutationMod = 4
+                elseif mutation == "Lava" then mutationMod = 6
+                elseif mutation == "Galaxy" then mutationMod = 7
+                elseif mutation == "YinYang" or mutation == "Yin Yang" then mutationMod = 7.5
+                elseif mutation == "Radioactive" then mutationMod = 8.5
+                elseif mutation == "Cursed" then mutationMod = 9
+                elseif mutation == "Rainbow" then mutationMod = 10
+                elseif mutation == "Divine" then mutationMod = 10
+                elseif mutation == "Cyber" then mutationMod = 11
+                elseif mutation == "Phantom" then mutationMod = 12
+                elseif mutation == "Crystal" then mutationMod = 13
+                end
+            end
+            
+            -- SOMAR todos os traits (exceto Sleepy)
+            local traitsSum = 0
+            if traitsTable and #traitsTable > 0 then
+                for _, trait in ipairs(traitsTable) do
+                    local traitMod = 0
+                    
+                    -- TRAITS OG
+                    if trait == "Strawberry" then traitMod = 8
+                    elseif trait == "Meowl" then traitMod = 7
+                    elseif trait == "John Pork" then traitMod = 6.5
+                    elseif trait == "Skibidi" then traitMod = 6
+                    
+                    -- TRAITS SEASONAL
+                    elseif trait == "Rainbow Balloon" then traitMod = 6.5
+                    elseif trait == "Pink Egg" then traitMod = 6.5
+                    elseif trait == "1 Year" then traitMod = 5.5
+                    elseif trait == "Pink Balloon" then traitMod = 5.5
+                    elseif trait == "Granny" then traitMod = 5.5
+                    elseif trait == "Reindeer Pet" then traitMod = 5
+                    elseif trait == "26" then traitMod = 5
+                    elseif trait == "Halo" then traitMod = 5
+                    elseif trait == "Lucky" then traitMod = 5
+                    elseif trait == "Red Balloon" then traitMod = 5
+                    elseif trait == "Blue Egg" then traitMod = 5
+                    elseif trait == "Sun" then traitMod = 5
+                    elseif trait == "Ball" then traitMod = 5
+                    elseif trait == "Bunny Ears" then traitMod = 4.5
+                    elseif trait == "Chocolate" then traitMod = 4.5
+                    elseif trait == "Jackolantern Pet" or trait == "Jack O'Lantern" then traitMod = 4.5
+                    elseif trait == "Blue Balloon" then traitMod = 4
+                    elseif trait == "Green Egg" then traitMod = 4
+                    elseif trait == "Santa Hat" then traitMod = 4
+                    elseif trait == "RIP Gravestone" or trait == "RIP Tombstone" then traitMod = 3.5
+                    elseif trait == "Green Balloon" then traitMod = 3.5
+                    elseif trait == "Orange Balloon" then traitMod = 3
+                    elseif trait == "Orange Egg" then traitMod = 3
+                    elseif trait == "Skeleton" then traitMod = 3
+                    elseif trait == "10B" then traitMod = 3
+                    elseif trait == "Witch Hat" then traitMod = 3
+                    
+                    -- TRAITS RITUALS
+                    elseif trait == "Paint" then traitMod = 5
+                    elseif trait == ":3" then traitMod = 4.5
+                    elseif trait == "Tie" then traitMod = 3.75
+                    elseif trait == "Spider" then traitMod = 3.5
+                    elseif trait == "Matteo Hat" then traitMod = 3.5
+                    elseif trait == "Galactic" then traitMod = 3
+                    elseif trait == "Explosive" then traitMod = 3
+                    elseif trait == "Shark Fin" then traitMod = 3
+                    
+                    -- TRAITS COUNTRY
+                    elseif trait == "Brazil" then traitMod = 5
+                    elseif trait == "Indonesia" then traitMod = 4
+                    elseif trait == "Sombrero" then traitMod = 4
+                    elseif trait == "Bull" then traitMod = 2
+                    
+                    -- TRAITS FIFA 2026 (todas 4.5x)
+                    elseif trait == "Algeria" or trait == "Argentina" or trait == "Australia" or trait == "Austria"
+                        or trait == "Belgium" or trait == "Bosnia and Herzegovina" or trait == "Canada" or trait == "Cape Verde"
+                        or trait == "Croatia" or trait == "Curacao" or trait == "Czechia" or trait == "DR Congo"
+                        or trait == "Ecuador" or trait == "Egypt" or trait == "England" or trait == "France"
+                        or trait == "Germany" or trait == "Ghana" or trait == "Haiti" or trait == "Iran"
+                        or trait == "Iraq" or trait == "Ivory Coast" or trait == "Japan" or trait == "Jordan"
+                        or trait == "Mexico" or trait == "Morocco" or trait == "Netherlands" or trait == "New Zealand"
+                        or trait == "Norway" or trait == "Panama" or trait == "Paraguay" or trait == "Portugal"
+                        or trait == "Qatar" or trait == "Saudi Arabia" or trait == "Scotland" or trait == "Senegal"
+                        or trait == "South Africa" or trait == "South Korea" or trait == "Spain" or trait == "Sweden"
+                        or trait == "Switzerland" or trait == "Tunisia" or trait == "Turkey" or trait == "United States"
+                        or trait == "Uruguay" or trait == "Uzbekistan" then traitMod = 4.5
+                    
+                    -- TRAITS ADMIN ABUSE
+                    elseif trait == "Fire" then traitMod = 5
+                    elseif trait == "Rose" then traitMod = 5
+                    elseif trait == "Fireworks" then traitMod = 5
+                    elseif trait == "Nyan" then traitMod = 5
+                    elseif trait == "Lightning" then traitMod = 5
+                    elseif trait == "Burger" then traitMod = 4.5
+                    elseif trait == "Aura Shades" then traitMod = 4.5
+                    elseif trait == "Disco" then traitMod = 4
+                    elseif trait == "Glitched" then traitMod = 4
+                    elseif trait == "Zombie" then traitMod = 4
+                    elseif trait == "Claws" or trait == "Crab Claw" then traitMod = 4
+                    elseif trait == "Bubblegum" then traitMod = 3
+                    elseif trait == "UFO" then traitMod = 2
+                    elseif trait == "Taco" then traitMod = 2
+                    
+                    -- TRAITS NATURAL EVENTS
+                    elseif trait == "Cometstruck" or trait == "Comet-struck" then traitMod = 2.5
+                    elseif trait == "Snowy" then traitMod = 2
+                    elseif trait == "Wet" then traitMod = 1.5
+                    
+                    -- Sleepy (não soma aqui, aplicado depois)
+                    elseif trait == "Sleepy" then traitMod = 0
+                    end
+                    
+                    traitsSum = traitsSum + traitMod
+                end
+            end
+            
+            -- CALCULAR: Base × (Mutation + TraitsSum)
+            genValue = baseGen * (mutationMod + traitsSum)
+            
+            -- Aplicar Sleepy por último (× 0.5)
+            if traitsTable then
+                for _, trait in ipairs(traitsTable) do
+                    if trait == "Sleepy" then
+                        genValue = genValue * 0.5
+                        break
+                    end
+                end
+            end
+            
+            if not genValue or genValue <= 0 then continue end
             
             local qualifies = shouldScan(name, genValue)
+            
             if qualifies then plotHasQualifying = true end
             local displayName = name
             local info = AnimalsData[name]
@@ -400,9 +565,27 @@ local function scanCarpet(seen, currentJobId)
         if (obj.ActionText or "") ~= "Purchase" then continue end
         local displayName, genValue = parseObjectText(obj.ObjectText)
         if not displayName or displayName == "" then continue end
-        if AnimalsData and AnimalsShared and AnimalsData[displayName] then
-            local ok, v = pcall(function() return AnimalsShared:GetGeneration(displayName, nil, nil, nil) end)
-            if ok and type(v) == "number" and v > 0 then genValue = v end
+        
+        -- Usar mesma lógica dos plots para pegar valor base correto
+        if AnimalsData and AnimalsData[displayName] then
+            local baseGen = nil
+            
+            -- Método 1: GetGenerationNoTraits (retorna $/s base SEM mutation)
+            if AnimalsShared then
+                local ok1, result1 = pcall(function() return AnimalsShared:GetGenerationNoTraits(displayName, nil) end)
+                if ok1 and type(result1) == "number" and result1 > 0 then 
+                    baseGen = result1
+                end
+            end
+            
+            -- Fallback: Usar AnimalsData base
+            if not baseGen then
+                baseGen = AnimalsData[displayName].Generation
+            end
+            
+            if baseGen and type(baseGen) == "number" and baseGen > 0 then
+                genValue = baseGen
+            end
         end
         if isBlacklisted(displayName) then continue end
         if not (genValue >= MIN_VALUE_CARPET or isTargeted(displayName) or isUltra(displayName)) then continue end
@@ -718,4 +901,4 @@ if Synchronizer then
 end
 
 if not found then print("❌ Nenhum brainrot valioso encontrado"); startInfiniteHop("Scan") end
-print("🚀 Sistema de Hop Infinito atvado!")
+print("🚀 Sistema de Hop Infinito ativado!")
