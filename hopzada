@@ -444,33 +444,16 @@ local function scanPlots(duelPlayers, seen, currentJobId)
                 if #traitsTable == 0 then traitsTable = nil end
             end
             
-            -- Tentar GetGeneration primeiro (pode retornar o valor já calculado)
-            local genSuccess, genValue
-            local pcallOk = pcall(function()
-                genSuccess, genValue = AnimalsShared:GetGeneration(name, mutation, traitsTable, nil)
-            end)
-            
-            -- Se GetGeneration retornou um valor numérico válido, usar diretamente
-            if pcallOk and type(genValue) == "number" and genValue > 0 then
-                -- Já vem com multiplicadores aplicados
-            elseif pcallOk and type(genSuccess) == "number" and genSuccess > 0 then
-                -- Formato antigo: primeiro retorno é o valor
-                genValue = genSuccess
-            else
-                -- Fallback: calcular manualmente base * mutation * traits
-                local animalInfo = AnimalsData[name]
-                local baseGen = 0
-                if animalInfo and type(animalInfo) == "table" then
-                    baseGen = animalInfo.GenerationPerSecond or animalInfo.GenPerSecond
-                        or animalInfo.Generation or animalInfo.Gen
-                        or animalInfo.BaseGen or animalInfo.BaseGeneration
-                        or animalInfo.MPS or animalInfo.MoneyPerSecond
-                        or animalInfo.Value or animalInfo.Price or animalInfo.Cost
-                        or 0
-                end
-                if type(baseGen) ~= "number" or baseGen <= 0 then continue end
-                genValue = calcGenWithMultipliers(baseGen, mutation, traitsList)
+            -- GetGeneration está broken (retorna nil/nil), usar Generation do AnimalsData + multiplicadores
+            local animalInfo = AnimalsData[name]
+            local baseGen = 0
+            if animalInfo and type(animalInfo) == "table" then
+                baseGen = animalInfo.Generation or 0
             end
+            if type(baseGen) ~= "number" or baseGen <= 0 then continue end
+            
+            -- Aplicar multiplicadores de mutation e traits
+            local genValue = calcGenWithMultipliers(baseGen, mutation, traitsList)
             
             local qualifies = shouldScan(name, genValue)
             if qualifies then plotHasQualifying = true end
@@ -521,36 +504,12 @@ local function scanCarpet(seen, currentJobId)
         local displayName = parseObjectText(obj.ObjectText)
         if not displayName or displayName == "" then continue end
         
-        -- Usar AnimalsData diretamente para pegar o M/s base e aplicar multiplicadores
+        -- Pegar M/s do campo Generation do AnimalsData (GetGeneration está broken)
         local genValue = 0
         if AnimalsData and AnimalsData[displayName] then
             local animalInfo = AnimalsData[displayName]
             if type(animalInfo) == "table" then
-                -- Pegar valor base
-                local baseGen = animalInfo.GenerationPerSecond or animalInfo.GenPerSecond
-                    or animalInfo.Generation or animalInfo.Gen
-                    or animalInfo.BaseGen or animalInfo.BaseGeneration
-                    or animalInfo.MPS or animalInfo.MoneyPerSecond
-                    or animalInfo.Value or animalInfo.Price or animalInfo.Cost
-                    or 0
-                
-                if type(baseGen) == "number" and baseGen > 0 then
-                    -- Carpet não tem mutation/traits visíveis, usar só o base
-                    -- Mas tentar GetGeneration pra ver se retorna algo melhor
-                    local altGenValue = 0
-                    if AnimalsShared then
-                        local genSuccess, genVal
-                        pcall(function()
-                            genSuccess, genVal = AnimalsShared:GetGeneration(displayName, nil, nil, nil)
-                        end)
-                        if type(genVal) == "number" then
-                            altGenValue = genVal
-                        elseif type(genSuccess) == "number" then
-                            altGenValue = genSuccess
-                        end
-                    end
-                    genValue = altGenValue > 0 and altGenValue or baseGen
-                end
+                genValue = animalInfo.Generation or 0
             end
         end
         
