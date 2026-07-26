@@ -440,18 +440,18 @@ local function sendWebhook(url, name, value, mutation, allResults, showFields, f
     local mutEmoji = getMutEmoji(mutation):gsub("%s+$", "")
     local genText = "$" .. formatValue(value) .. "/s"
     
-    local notifierType = "Midlights"
+local notifierType = "Midlights"
 
-    for _, r in ipairs(allResults) do
-        if r.name == name then
-            if r.tier == "ULTRA" then
-                notifierType = "Ultralights"
-            elseif r.tier == "HIGH" then
-                notifierType = "Highlights"
-            end
-            break
+for _, r in ipairs(allResults) do
+    if r.name == name then
+        if r.tier == "ULTRA" then
+            notifierType = "Ultralights"
+        elseif r.tier == "HIGH" then
+            notifierType = "Highlights"
         end
+        break
     end
+end
 
     local isKeyWebhook = url == WEBHOOK_MID or url == WEBHOOK_HIGH or url == WEBHOOK_ULTRA
     local traitsText = ""
@@ -578,7 +578,7 @@ text.Font = Enum.Font.SourceSansBold
 local function startInfiniteHop(label)
     print("[HOP] Iniciando...")
     if not game:IsLoaded() then game.Loaded:Wait() end
-    task.wait(0.5) -- ⚡ Reduzido de 1 para 0.5 segundos
+    task.wait(1)
     
     local visited = getVisitedServers()
     visited[game.JobId] = os.time()
@@ -631,19 +631,24 @@ local function startInfiniteHop(label)
                 currentVisited[chosen.id] = os.time()
                 saveVisitedServers(currentVisited)
                 
-                -- ⚡ TELEPORTE IMEDIATO (sem pcall delay)
-                TeleportService:TeleportToPlaceInstance(PLACE_ID, chosen.id, LocalPlayer)
+                local teleportSuccess, teleportErr = pcall(function()
+                    TeleportService:TeleportToPlaceInstance(PLACE_ID, chosen.id, LocalPlayer)
+                end)
                 
-                task.wait(1) -- ⚡ Reduzido de 2 para 1 segundo
+                if not teleportSuccess then
+                    print("[HOP] ⚠️ Erro no teleporte: " .. tostring(teleportErr))
+                end
+                
+                task.wait(2)
             else
                 text.Text = "⏳ Sem servidores novos disponíveis..."
-                task.wait(2) -- ⚡ Reduzido de 3 para 2 segundos
+                task.wait(3)
             end
         else
             text.Text = "⏳ Erro ao buscar servidores..."
-            task.wait(2) -- ⚡ Reduzido de 3 para 2 segundos
+            task.wait(3)
         end
-        task.wait(0.3) -- ⚡ Reduzido de 0.5 para 0.3 segundos
+        task.wait(0.5)
     end
 end
 
@@ -691,13 +696,6 @@ if Synchronizer then
         local best = bestUltra or results[1]
         
         if best then
-            -- 🚀 LOG PRIMEIRO (mais rápido!)
-            print("✅ Sucesso:", best.name, "| Owner:", best.ownerName, "|", best.gen)
-            
-            -- 1️⃣ RAILWAY PRIMEIRO (para o script detectar rápido)
-            sendToRailwayAPI(best.name, detectedJobId, best.gen, best.value, getUserKey(), best.ownerName, #Players:GetPlayers(), Players.MaxPlayers, PLACE_ID)
-            
-            -- 2️⃣ WEBHOOKS DEPOIS (todos os canais)
             sendWebhook(WEBHOOK_URL, best.name, best.value, best.mutation, results, true, "Bob Notify", best.ownerName, detectedJobId, true, best.inDuel)
             
             local isUltraName = false
@@ -712,6 +710,8 @@ if Synchronizer then
                 sendWebhook(WEBHOOK_MID, best.name, best.value, best.mutation, results, false, "Mid", best.ownerName, detectedJobId, false, best.inDuel) 
             end
             
+            sendToRailwayAPI(best.name, detectedJobId, best.gen, best.value, getUserKey(), best.ownerName, #Players:GetPlayers(), Players.MaxPlayers, PLACE_ID)
+            print("✅ Sucesso:", best.name, "| Owner:", best.ownerName, "|", best.gen)
             startInfiniteHop(best.name)
         end
     end
