@@ -138,6 +138,95 @@ local TRAIT_EMOJIS = {
     ["Burger"]="<:Burger:1518450900413452380>",
 }
 
+-- ════ MULTIPLICADORES DE MUTAÇÃO ════
+local MUTATION_MULTIPLIERS = {
+    ["None"] = 1, [""] = 1, ["Default"] = 1,
+    ["Gold"] = 1.25,
+    ["Diamond"] = 1.5,
+    ["Blood Rot"] = 2, ["Bloodrot"] = 2,
+    ["Candy"] = 4,
+    ["Lava"] = 6,
+    ["Dreamy"] = 6,
+    ["Galaxy"] = 7,
+    ["Galaxy"] = 7,
+    ["Yin Yang"] = 7.5, ["YinYang"] = 7.5,
+    ["Radioactive"] = 8.5,
+    ["Cursed"] = 9,
+    ["Rainbow"] = 10, ["Divine"] = 10,
+    ["Cyber"] = 11, ["Disco"] = 11,
+    ["Phantom"] = 5,
+    ["Zombie"] = 5,
+}
+
+-- ════ MULTIPLICADORES DE TRAITS ════
+local TRAIT_MULTIPLIERS = {
+    -- Multiplicadores altos
+    ["Strawberry"] = 5, ["Meowl"] = 5, ["Skibidi"] = 5,
+    ["Rainbow Balloon"] = 6, ["RainbowBalloon"] = 6,
+    ["Pink Egg"] = 6, ["PinkEgg"] = 6,
+    ["John Pork"] = 4, ["JohnPork"] = 4,
+    -- Multiplicadores médios
+    ["Zombie"] = 2, ["Fireworks"] = 2, ["Fireworks"] = 2, ["Galactic"] = 2,
+    ["Disco"] = 1.5, ["Halo"] = 1.5, ["Paint"] = 1.5,
+    ["Chocolate"] = 1.5, ["Gingerbread Town"] = 1.5, ["GingerbreadTown"] = 1.5,
+    ["Claws"] = 1.5, ["Explosive"] = 2, ["Lightning"] = 1.5,
+    ["Jackolantern Pet"] = 1.5, ["JackOLanternPet"] = 1.5,
+    ["Skeleton"] = 1.5, ["Sleepy"] = 1.25, ["Reindeer Pet"] = 1.5, ["ReindeerPet"] = 1.5,
+    ["Sun"] = 2, ["Aura Shades"] = 1.5, ["AuraShades"] = 1.5,
+    ["Burger"] = 1.5, ["1 Year"] = 2, ["1Year"] = 2,
+    [":3"] = 1.1, ["ColonThree"] = 1.1,
+    ["Cometstruck"] = 1.5,
+    ["Bubblegum"] = 1.1, ["Brazil"] = 1.1, ["Indonesia"] = 1.1,
+    ["Blue Egg"] = 1.1, ["BlueEgg"] = 1.1,
+    ["Blue Balloon"] = 1.1, ["BlueBalloon"] = 1.1,
+    ["Bunny Ears"] = 1.1, ["BunnyEars"] = 1.1,
+    ["Fire"] = 1.25,
+    ["Glitched"] = 1.5,
+    ["Granny"] = 1.25,
+    ["Green Balloon"] = 1.1, ["GreenBalloon"] = 1.1,
+    ["Green Egg"] = 1.1, ["GreenEgg"] = 1.1,
+    ["Lucky"] = 10,
+    ["Matteo Hat"] = 1.25, ["MatteoHat"] = 1.25,
+    ["Nyan"] = 1.5,
+    ["Orange Balloon"] = 1.1, ["OrangeBalloon"] = 1.1,
+    ["Orange Egg"] = 1.1, ["OrangeEgg"] = 1.1,
+    ["Pink Balloon"] = 1.1, ["PinkBalloon"] = 1.1,
+    ["RIP Gravestone"] = 1.25, ["RIPGravestone"] = 1.25,
+    ["Red Balloon"] = 1.1, ["RedBalloon"] = 1.1,
+    ["Rose"] = 1.1,
+    ["Santa Hat"] = 1.25, ["SantaHat"] = 1.25,
+    ["Shark Fin"] = 1.5, ["SharkFin"] = 1.5,
+    ["Snowy"] = 1.1,
+    ["Sombrero"] = 1.25,
+    ["Spider"] = 1.5,
+    ["Taco"] = 1.5,
+    ["10B"] = 2, ["TenB"] = 2,
+    ["Tie"] = 1.25,
+    ["26"] = 1.5, ["TwentySix"] = 1.5,
+    ["UFO"] = 1.5,
+    ["Wet"] = 1.25,
+    ["Witch Hat"] = 1.5, ["WitchingHour"] = 1.5,
+    ["Claws"] = 1.5, ["crab_rave"] = 1.5,
+}
+
+-- ════ CÁLCULO DE GERAÇÃO COM MULTIPLICADORES ════
+local function calcGenWithMultipliers(baseGen, mutation, traitsList)
+    local mult = 1
+    -- Aplicar multiplicador de mutação
+    if mutation and MUTATION_MULTIPLIERS[mutation] then
+        mult = mult * MUTATION_MULTIPLIERS[mutation]
+    end
+    -- Aplicar multiplicadores de traits
+    if traitsList and type(traitsList) == "table" then
+        for _, trait in ipairs(traitsList) do
+            if TRAIT_MULTIPLIERS[trait] then
+                mult = mult * TRAIT_MULTIPLIERS[trait]
+            end
+        end
+    end
+    return baseGen * mult
+end
+
 local Synchronizer  = nil
 local AnimalsData   = nil
 local AnimalsShared = nil
@@ -355,33 +444,32 @@ local function scanPlots(duelPlayers, seen, currentJobId)
                 if #traitsTable == 0 then traitsTable = nil end
             end
             
-            -- GetGeneration retorna: (sucesso, valor)
+            -- Tentar GetGeneration primeiro (pode retornar o valor já calculado)
             local genSuccess, genValue
             local pcallOk = pcall(function()
                 genSuccess, genValue = AnimalsShared:GetGeneration(name, mutation, traitsTable, nil)
             end)
-            if not pcallOk then continue end
             
-            -- Formato antigo: genSuccess eh numero; Formato novo: genSuccess eh boolean
-            if type(genSuccess) == "number" then
+            -- Se GetGeneration retornou um valor numérico válido, usar diretamente
+            if pcallOk and type(genValue) == "number" and genValue > 0 then
+                -- Já vem com multiplicadores aplicados
+            elseif pcallOk and type(genSuccess) == "number" and genSuccess > 0 then
+                -- Formato antigo: primeiro retorno é o valor
                 genValue = genSuccess
-            elseif type(genSuccess) == "boolean" then
-                if not genSuccess then continue end
-            end
-            
-            if type(genValue) ~= "number" then
-                -- Fallback: tentar AnimalsData diretamente
+            else
+                -- Fallback: calcular manualmente base * mutation * traits
                 local animalInfo = AnimalsData[name]
+                local baseGen = 0
                 if animalInfo and type(animalInfo) == "table" then
-                    local altValue = animalInfo.Generation or animalInfo.Gen or animalInfo.Value or animalInfo.BaseGen or animalInfo.Price or animalInfo.Cost
-                    if type(altValue) == "number" then
-                        genValue = altValue
-                    else
-                        continue
-                    end
-                else
-                    continue
+                    baseGen = animalInfo.GenerationPerSecond or animalInfo.GenPerSecond
+                        or animalInfo.Generation or animalInfo.Gen
+                        or animalInfo.BaseGen or animalInfo.BaseGeneration
+                        or animalInfo.MPS or animalInfo.MoneyPerSecond
+                        or animalInfo.Value or animalInfo.Price or animalInfo.Cost
+                        or 0
                 end
+                if type(baseGen) ~= "number" or baseGen <= 0 then continue end
+                genValue = calcGenWithMultipliers(baseGen, mutation, traitsList)
             end
             
             local qualifies = shouldScan(name, genValue)
@@ -433,34 +521,35 @@ local function scanCarpet(seen, currentJobId)
         local displayName = parseObjectText(obj.ObjectText)
         if not displayName or displayName == "" then continue end
         
-        -- Usar AnimalsData diretamente para pegar o M/s
+        -- Usar AnimalsData diretamente para pegar o M/s base e aplicar multiplicadores
         local genValue = 0
         if AnimalsData and AnimalsData[displayName] then
             local animalInfo = AnimalsData[displayName]
             if type(animalInfo) == "table" then
-                -- Primeiro tenta campos de geração (M/s): GenerationPerSecond, GenPerSecond, MPS, etc.
-                genValue = animalInfo.GenerationPerSecond or animalInfo.GenPerSecond or animalInfo.GenerationPerSec 
-                    or animalInfo.MPS or animalInfo.MoneyPerSecond or animalInfo.MoneyPerSec
+                -- Pegar valor base
+                local baseGen = animalInfo.GenerationPerSecond or animalInfo.GenPerSecond
                     or animalInfo.Generation or animalInfo.Gen
-                -- Se não achou, tenta campos base (pode ser o base M/s):
-                if type(genValue) ~= "number" then
-                    genValue = animalInfo.BaseGeneration or animalInfo.BaseGen or animalInfo.BaseMPS
-                end
-                -- Se ainda não achou, tentar GetGeneration via Shared
-                if type(genValue) ~= "number" and AnimalsShared then
-                    local genSuccess, genVal
-                    pcall(function()
-                        genSuccess, genVal = AnimalsShared:GetGeneration(displayName, nil, nil, nil)
-                    end)
-                    if type(genSuccess) == "number" then
-                        genValue = genSuccess
-                    elseif type(genVal) == "number" then
-                        genValue = genVal
+                    or animalInfo.BaseGen or animalInfo.BaseGeneration
+                    or animalInfo.MPS or animalInfo.MoneyPerSecond
+                    or animalInfo.Value or animalInfo.Price or animalInfo.Cost
+                    or 0
+                
+                if type(baseGen) == "number" and baseGen > 0 then
+                    -- Carpet não tem mutation/traits visíveis, usar só o base
+                    -- Mas tentar GetGeneration pra ver se retorna algo melhor
+                    local altGenValue = 0
+                    if AnimalsShared then
+                        local genSuccess, genVal
+                        pcall(function()
+                            genSuccess, genVal = AnimalsShared:GetGeneration(displayName, nil, nil, nil)
+                        end)
+                        if type(genVal) == "number" then
+                            altGenValue = genVal
+                        elseif type(genSuccess) == "number" then
+                            altGenValue = genSuccess
+                        end
                     end
-                end
-                -- Se ainda não tem número, logar os campos para diagnóstico
-                if type(genValue) ~= "number" then
-                    genValue = 0
+                    genValue = altGenValue > 0 and altGenValue or baseGen
                 end
             end
         end
