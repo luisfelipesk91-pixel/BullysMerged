@@ -421,7 +421,8 @@ local function scanPlots(duelPlayers, seen, currentJobId)
             local data = animalData.Data or animalData
             local mutation = data.Mutation
             if type(mutation) ~= "string" or mutation == "" then mutation = nil end
-            
+
+            -- Traits: idêntico ao hopexemplo — array de strings ou nil
             local traitsTable = nil
             local traitsList = {}
             if type(data.Traits) == "table" then
@@ -443,17 +444,12 @@ local function scanPlots(duelPlayers, seen, currentJobId)
                 end
                 if #traitsTable == 0 then traitsTable = nil end
             end
-            
-            -- GetGeneration está broken (retorna nil/nil), usar Generation do AnimalsData + multiplicadores
-            local animalInfo = AnimalsData[name]
-            local baseGen = 0
-            if animalInfo and type(animalInfo) == "table" then
-                baseGen = animalInfo.Generation or 0
-            end
-            if type(baseGen) ~= "number" or baseGen <= 0 then continue end
-            
-            -- Aplicar multiplicadores de mutation e traits
-            local genValue = calcGenWithMultipliers(baseGen, mutation, traitsList)
+
+            -- Valor real do jogo — mesmo padrão do hopexemplo, sem nenhum cálculo manual
+            local ok3, genValue = pcall(function()
+                return AnimalsShared:GetGeneration(name, mutation, traitsTable, nil)
+            end)
+            if not ok3 or type(genValue) ~= "number" or genValue <= 0 then continue end
             
             local qualifies = shouldScan(name, genValue)
             if qualifies then plotHasQualifying = true end
@@ -463,7 +459,7 @@ local function scanPlots(duelPlayers, seen, currentJobId)
             table.insert(plotItems, {
                 name = displayName, index = name, genValue = genValue,
                 mutation = mutation, traitsList = traitsList,
-                traitCount = traitsTable and #traitsTable or 0,
+                traitCount = #traitsList,
                 inDuel = inDuel, qualifies = qualifies, ownerName = ownerName,
             })
         end
@@ -495,16 +491,15 @@ local function parseObjectText(objectText)
     return name, 0
 end
 
-local function scanCarpet(seen, currentJobId)
+local function scanCarpetInternal(minVal)
     local results = {}
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if not obj:IsA("ProximityPrompt") or not obj.Enabled then continue end
         if (obj.ActionText or "") ~= "Purchase" then continue end
-        
+
         local displayName = parseObjectText(obj.ObjectText)
         if not displayName or displayName == "" then continue end
-        
-        -- Pegar M/s do campo Generation do AnimalsData (GetGeneration está broken)
+
         local genValue = 0
         if AnimalsData and AnimalsData[displayName] then
             local animalInfo = AnimalsData[displayName]
@@ -512,10 +507,17 @@ local function scanCarpet(seen, currentJobId)
                 genValue = animalInfo.Generation or 0
             end
         end
-        
+        -- GetGeneration funciona — usa valor real do servidor como override
+        if AnimalsData and AnimalsShared and AnimalsData[displayName] then
+            local ok, v = pcall(function()
+                return AnimalsShared:GetGeneration(displayName, nil, nil, nil)
+            end)
+            if ok and type(v) == "number" and v > 0 then genValue = v end
+        end
+
         if isBlacklisted(displayName) then continue end
-        if not (genValue >= MIN_VALUE_CARPET or isTargeted(displayName) or isUltra(displayName)) then continue end
-        
+        if not (genValue >= minVal or isTargeted(displayName) or isUltra(displayName)) then continue end
+
         local genText = genValue > 0 and ("$" .. formatValue(genValue) .. "/s") or "?"
         table.insert(results, {
             tier = (genValue >= 1e9 or isUltra(displayName)) and "ULTRA" or (genValue >= 100e6) and "HIGH" or "MID",
@@ -525,6 +527,15 @@ local function scanCarpet(seen, currentJobId)
         print(string.format("✅ CARPET FOUND: %s | Gen: %s", displayName, genText))
     end
     return results
+end
+
+local function scanCarpet(seen, currentJobId)
+    return scanCarpetInternal(MIN_VALUE_CARPET)
+end
+
+-- Fallback: se plots vazios, aceita qualquer carpet (sem filtro de valor mínimo)
+local function scanCarpetFallback(seen, currentJobId)
+    return scanCarpetInternal(0)
 end
 
 local function getBrainrotImage(name)
@@ -780,6 +791,15 @@ if Synchronizer then
     local carpetResults = scanCarpet(seen, detectedJobId)
     for _, r in ipairs(carpetResults) do table.insert(results, r) end
     print(string.format("📦 Plots: %d | 🎠 Carpet: %d | Total: %d", #results - #carpetResults, #carpetResults, #results))
+
+    -- Fallback: nenhum resultado nos plots/carpet normal → aceita qualquer carpet sem filtro de valor
+    if #results == 0 then
+        local fallbackCarpet = scanCarpetFallback(seen, detectedJobId)
+        if #fallbackCarpet > 0 then
+            print(string.format("🟡 Carpet-only fallback: %d item(s) encontrado(s)", #fallbackCarpet))
+            for _, r in ipairs(fallbackCarpet) do table.insert(results, r) end
+        end
+    end
 
     if type(results) == "table" and #results > 0 then
         found = true
