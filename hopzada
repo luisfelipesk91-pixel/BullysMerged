@@ -41,8 +41,8 @@ local RAILWAY_CLIENT = "Bobnotify"
 local TARGET_NAMES   = {""}
 local ULTRA_BRAINROTS = {"Dragon Cannelloni", "Pineaplino", "Caramello Filtrello", "Avocadorilla", "Tob Tobi Tobi", "Bearito Cabinito", "Venuspino", "Festive 67", "Gorillo Subwoofero", "Cerberus", "Centrucci Nuclucci", "Rhino Helicopterino", "La Casa Boo", "Ganganzelli Trulala", "Strawberry Elephant", "Headless Horseman", "Skibidi Toilet", "Meowl", "Griffin", "Dragon Gingerini", "Hydra Dragon Cannelloni", "Ice Dragon", "Love Love Bear", "Digi Narwhal", "La Supreme Combinasion", "Hydra Bunny", "Bunny and Eggy", "Rosey and Teddy", "Cooki and Milki", "Arcadragon", "Ketupat Bros", "Reinito Sleghito", "Fortunu and Cashuru", "Los Amigos", "Pancake and Syrup", "Foxini Larternini", "Kalika Bros", "Los Sekolahs", "Signore Carapace", "Fragrama and Chocrama", "Cash or Card", "La Casa Boo", "La Food Combinasion", "Elefanto Frigo", "Spooky and Pumpky", "Boppin Bunny", "Ginger Gerat", "Los Chillis", "Sammyni Fattini", "Los Spaghettis", "Festive 67", "Quackini Snackini", "Antonio", "Hopilikalika Hopilikalako", "Fishino Clownino", "Jolly Jolly Sahur", "Tirilikaliko Tirilikalako", "Lovin Rose", "Fragola La La La", "Los Tacoritas", "Dragon Aquanini", "Tirilikalika Tirilikalako", "Jelly Moby", "Duggy Bros", "Sammyni Cakini", "Los Hackers", "Rubrikiko", "Rico Dinero", "Money Money Bros", "Dug Dug Dug", "Globa Steppa", "Caramelo Filtrello", "Gorilo Subwoofero", "Kraken"}
 local BLACK_NAMES    = {"Fishboard", "Chicleteira Bicicleteira", "Octoball", "Aquarino", "Lucky Block", "Los Taco Blocks", "To to to Sahur", "Graipuss Medussi", "Bunny Bunny Bunny Sahur", "Serafinna Medusella", "Chicleteirina Bicicleteirina", "Santa Hotspot", "Cupid Hotspot", "Los Quesadillas", "Naughty Naughty", "Flancito", "Capitano Gullini", "La Vacca Lepre Lepreino", "Quesadilla Crocodilla", "Easter Easter Easter Sahur", "Bombardiro Vaccariro", "Burrito Bandito", "Los Nooo My Hotspotsitos"}
-local MIN_VALUE        = 20000000
-local MIN_VALUE_CARPET = 20000000
+local MIN_VALUE        = 25000000
+local MIN_VALUE_CARPET = 25000000
 local NOTIFIER_NAME = "bob"
 local CURRENT_JOB   = tostring(game.JobId)
 local PLACE_ID      = game.PlaceId
@@ -137,95 +137,6 @@ local TRAIT_EMOJIS = {
     ["Aura Shades"]="<:AuraShades:1518450902795685908>",
     ["Burger"]="<:Burger:1518450900413452380>",
 }
-
--- ════ MULTIPLICADORES DE MUTAÇÃO ════
-local MUTATION_MULTIPLIERS = {
-    ["None"] = 1, [""] = 1, ["Default"] = 1,
-    ["Gold"] = 1.25,
-    ["Diamond"] = 1.5,
-    ["Blood Rot"] = 2, ["Bloodrot"] = 2,
-    ["Candy"] = 4,
-    ["Lava"] = 6,
-    ["Dreamy"] = 6,
-    ["Galaxy"] = 7,
-    ["Galaxy"] = 7,
-    ["Yin Yang"] = 7.5, ["YinYang"] = 7.5,
-    ["Radioactive"] = 8.5,
-    ["Cursed"] = 9,
-    ["Rainbow"] = 10, ["Divine"] = 10,
-    ["Cyber"] = 11, ["Disco"] = 11,
-    ["Phantom"] = 5,
-    ["Zombie"] = 5,
-}
-
--- ════ MULTIPLICADORES DE TRAITS ════
-local TRAIT_MULTIPLIERS = {
-    -- Multiplicadores altos
-    ["Strawberry"] = 5, ["Meowl"] = 5, ["Skibidi"] = 5,
-    ["Rainbow Balloon"] = 6, ["RainbowBalloon"] = 6,
-    ["Pink Egg"] = 6, ["PinkEgg"] = 6,
-    ["John Pork"] = 4, ["JohnPork"] = 4,
-    -- Multiplicadores médios
-    ["Zombie"] = 2, ["Fireworks"] = 2, ["Fireworks"] = 2, ["Galactic"] = 2,
-    ["Disco"] = 1.5, ["Halo"] = 1.5, ["Paint"] = 1.5,
-    ["Chocolate"] = 1.5, ["Gingerbread Town"] = 1.5, ["GingerbreadTown"] = 1.5,
-    ["Claws"] = 1.5, ["Explosive"] = 2, ["Lightning"] = 1.5,
-    ["Jackolantern Pet"] = 1.5, ["JackOLanternPet"] = 1.5,
-    ["Skeleton"] = 1.5, ["Sleepy"] = 1.25, ["Reindeer Pet"] = 1.5, ["ReindeerPet"] = 1.5,
-    ["Sun"] = 2, ["Aura Shades"] = 1.5, ["AuraShades"] = 1.5,
-    ["Burger"] = 1.5, ["1 Year"] = 2, ["1Year"] = 2,
-    [":3"] = 1.1, ["ColonThree"] = 1.1,
-    ["Cometstruck"] = 1.5,
-    ["Bubblegum"] = 1.1, ["Brazil"] = 1.1, ["Indonesia"] = 1.1,
-    ["Blue Egg"] = 1.1, ["BlueEgg"] = 1.1,
-    ["Blue Balloon"] = 1.1, ["BlueBalloon"] = 1.1,
-    ["Bunny Ears"] = 1.1, ["BunnyEars"] = 1.1,
-    ["Fire"] = 1.25,
-    ["Glitched"] = 1.5,
-    ["Granny"] = 1.25,
-    ["Green Balloon"] = 1.1, ["GreenBalloon"] = 1.1,
-    ["Green Egg"] = 1.1, ["GreenEgg"] = 1.1,
-    ["Lucky"] = 10,
-    ["Matteo Hat"] = 1.25, ["MatteoHat"] = 1.25,
-    ["Nyan"] = 1.5,
-    ["Orange Balloon"] = 1.1, ["OrangeBalloon"] = 1.1,
-    ["Orange Egg"] = 1.1, ["OrangeEgg"] = 1.1,
-    ["Pink Balloon"] = 1.1, ["PinkBalloon"] = 1.1,
-    ["RIP Gravestone"] = 1.25, ["RIPGravestone"] = 1.25,
-    ["Red Balloon"] = 1.1, ["RedBalloon"] = 1.1,
-    ["Rose"] = 1.1,
-    ["Santa Hat"] = 1.25, ["SantaHat"] = 1.25,
-    ["Shark Fin"] = 1.5, ["SharkFin"] = 1.5,
-    ["Snowy"] = 1.1,
-    ["Sombrero"] = 1.25,
-    ["Spider"] = 1.5,
-    ["Taco"] = 1.5,
-    ["10B"] = 2, ["TenB"] = 2,
-    ["Tie"] = 1.25,
-    ["26"] = 1.5, ["TwentySix"] = 1.5,
-    ["UFO"] = 1.5,
-    ["Wet"] = 1.25,
-    ["Witch Hat"] = 1.5, ["WitchingHour"] = 1.5,
-    ["Claws"] = 1.5, ["crab_rave"] = 1.5,
-}
-
--- ════ CÁLCULO DE GERAÇÃO COM MULTIPLICADORES ════
-local function calcGenWithMultipliers(baseGen, mutation, traitsList)
-    local mult = 1
-    -- Aplicar multiplicador de mutação
-    if mutation and MUTATION_MULTIPLIERS[mutation] then
-        mult = mult * MUTATION_MULTIPLIERS[mutation]
-    end
-    -- Aplicar multiplicadores de traits
-    if traitsList and type(traitsList) == "table" then
-        for _, trait in ipairs(traitsList) do
-            if TRAIT_MULTIPLIERS[trait] then
-                mult = mult * TRAIT_MULTIPLIERS[trait]
-            end
-        end
-    end
-    return baseGen * mult
-end
 
 local Synchronizer  = nil
 local AnimalsData   = nil
@@ -389,14 +300,11 @@ local function scanPlots(duelPlayers, seen, currentJobId)
     local results = {}
     local plots = Workspace:FindFirstChild("Plots")
     if not plots then return results end
-    
     for _, plot in ipairs(plots:GetChildren()) do
         local ok, pot = pcall(function() return Synchronizer:Get(plot.Name) end)
         if not ok or not pot then continue end
-        
         local ok2, list = pcall(function() return pot:Get("AnimalList") end)
         if not ok2 or type(list) ~= "table" then continue end
-        
         local syncOwner = nil
         local ownerOk, ownerVal = pcall(function() return pot:Get("Owner") end)
         if ownerOk and ownerVal ~= nil then
@@ -406,23 +314,35 @@ local function scanPlots(duelPlayers, seen, currentJobId)
         if syncOwner and duelPlayers[syncOwner] then plotDuel = true
         else plotDuel = isPlotOwnerInDuel(plot, duelPlayers) end
         local ownerName = syncOwner or resolveOwnerName(ownerVal) or "?"
-        
-        local plotHasQualifying = false
         local plotItems = {}
-        
-        for _, animalData in pairs(list) do
+        local plotHasQualifying = false
+        for k, petId in pairs(list) do
+            -- ✅ FIX CRÍTICO: Synchronizer agora retorna UUIDs (strings), não objetos
+            local animalData = nil
+            if type(petId) == "string" then
+                -- Buscar dados do pet pelo UUID
+                local ok, fetchedData = pcall(function() return pot:Get(petId) end)
+                if ok and type(fetchedData) == "table" then
+                    animalData = fetchedData
+                else
+                    continue
+                end
+            elseif type(petId) == "table" then
+                -- Formato antigo (objetos diretos) - compatibilidade
+                animalData = petId
+            else
+                continue
+            end
+            
             if type(animalData) ~= "table" then continue end
             if isFusing(animalData) then continue end
             local name = animalData.Index
             if not name then continue end
             if not AnimalsData or not AnimalsData[name] then continue end
-            
             local inDuel = isInDuel(animalData) or plotDuel
             local data = animalData.Data or animalData
             local mutation = data.Mutation
             if type(mutation) ~= "string" or mutation == "" then mutation = nil end
-
-            -- Traits: idêntico ao hopexemplo — array de strings ou nil
             local traitsTable = nil
             local traitsList = {}
             if type(data.Traits) == "table" then
@@ -444,13 +364,10 @@ local function scanPlots(duelPlayers, seen, currentJobId)
                 end
                 if #traitsTable == 0 then traitsTable = nil end
             end
-
-            -- Valor real do jogo — mesmo padrão do hopexemplo, sem nenhum cálculo manual
             local ok3, genValue = pcall(function()
                 return AnimalsShared:GetGeneration(name, mutation, traitsTable, nil)
             end)
-            if not ok3 or type(genValue) ~= "number" or genValue <= 0 then continue end
-            
+            if not ok3 or type(genValue) ~= "number" then continue end
             local qualifies = shouldScan(name, genValue)
             if qualifies then plotHasQualifying = true end
             local displayName = name
@@ -459,13 +376,11 @@ local function scanPlots(duelPlayers, seen, currentJobId)
             table.insert(plotItems, {
                 name = displayName, index = name, genValue = genValue,
                 mutation = mutation, traitsList = traitsList,
-                traitCount = #traitsList,
+                traitCount = traitsTable and #traitsTable or 0,
                 inDuel = inDuel, qualifies = qualifies, ownerName = ownerName,
             })
         end
-        
         if not plotHasQualifying then continue end
-        
         for _, item in ipairs(plotItems) do
             if not item.qualifies then continue end
             local genText = "$" .. formatValue(item.genValue) .. "/s"
@@ -478,46 +393,32 @@ local function scanPlots(duelPlayers, seen, currentJobId)
             print(string.format("FOUND: %s | Mutation: %s | Traits: %d | Gen: %s", item.name, item.mutation or "None", item.traitCount, genText))
         end
     end
-    
     return results
 end
 
 local function parseObjectText(objectText)
     if not objectText or objectText == "" then return nil, 0 end
-    -- Extrai APENAS o nome do animal, removendo o preço (tudo a partir do $)
-    -- Ex: "Svinina Bombardino $1.2K" -> "Svinina Bombardino"
-    local name = objectText:match("^(.-)%s*%$") or objectText:match("^%s*(.-)%s*$")
-    if name then name = name:match("^%s*(.-)%s*$") end
-    return name, 0
+    local name, valStr = objectText:match("^(.-)%s*%$([%d%.]+[KkMmBbTt]?)%s*$")
+    if name and valStr then
+        name = name:match("^%s*(.-)%s*$")
+        return name, parseValue("$" .. valStr .. "/s")
+    end
+    return objectText:match("^%s*(.-)%s*$"), 0
 end
 
-local function scanCarpetInternal(minVal)
+local function scanCarpet(seen, currentJobId)
     local results = {}
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if not obj:IsA("ProximityPrompt") or not obj.Enabled then continue end
         if (obj.ActionText or "") ~= "Purchase" then continue end
-
-        local displayName = parseObjectText(obj.ObjectText)
+        local displayName, genValue = parseObjectText(obj.ObjectText)
         if not displayName or displayName == "" then continue end
-
-        local genValue = 0
-        if AnimalsData and AnimalsData[displayName] then
-            local animalInfo = AnimalsData[displayName]
-            if type(animalInfo) == "table" then
-                genValue = animalInfo.Generation or 0
-            end
-        end
-        -- GetGeneration funciona — usa valor real do servidor como override
         if AnimalsData and AnimalsShared and AnimalsData[displayName] then
-            local ok, v = pcall(function()
-                return AnimalsShared:GetGeneration(displayName, nil, nil, nil)
-            end)
+            local ok, v = pcall(function() return AnimalsShared:GetGeneration(displayName, nil, nil, nil) end)
             if ok and type(v) == "number" and v > 0 then genValue = v end
         end
-
         if isBlacklisted(displayName) then continue end
-        if not (genValue >= minVal or isTargeted(displayName) or isUltra(displayName)) then continue end
-
+        if not (genValue >= MIN_VALUE_CARPET or isTargeted(displayName) or isUltra(displayName)) then continue end
         local genText = genValue > 0 and ("$" .. formatValue(genValue) .. "/s") or "?"
         table.insert(results, {
             tier = (genValue >= 1e9 or isUltra(displayName)) and "ULTRA" or (genValue >= 100e6) and "HIGH" or "MID",
@@ -527,15 +428,6 @@ local function scanCarpetInternal(minVal)
         print(string.format("✅ CARPET FOUND: %s | Gen: %s", displayName, genText))
     end
     return results
-end
-
-local function scanCarpet(seen, currentJobId)
-    return scanCarpetInternal(MIN_VALUE_CARPET)
-end
-
--- Fallback: se plots vazios, aceita qualquer carpet (sem filtro de valor mínimo)
-local function scanCarpetFallback(seen, currentJobId)
-    return scanCarpetInternal(0)
 end
 
 local function getBrainrotImage(name)
@@ -718,9 +610,7 @@ local function startInfiniteHop(label)
 
             local availableServers = {}
             for _, server in ipairs(result.data) do
-                                local playing = server.playing or 0
-                local maxPlayers = server.maxPlayers or 0
-                if server.id ~= game.JobId and not currentVisited[server.id] and playing < maxPlayers then
+                if server.id ~= game.JobId and not currentVisited[server.id] and server.playing < server.maxPlayers then
                     table.insert(availableServers, server)
                 end
             end
@@ -791,15 +681,6 @@ if Synchronizer then
     local carpetResults = scanCarpet(seen, detectedJobId)
     for _, r in ipairs(carpetResults) do table.insert(results, r) end
     print(string.format("📦 Plots: %d | 🎠 Carpet: %d | Total: %d", #results - #carpetResults, #carpetResults, #results))
-
-    -- Fallback: nenhum resultado nos plots/carpet normal → aceita qualquer carpet sem filtro de valor
-    if #results == 0 then
-        local fallbackCarpet = scanCarpetFallback(seen, detectedJobId)
-        if #fallbackCarpet > 0 then
-            print(string.format("🟡 Carpet-only fallback: %d item(s) encontrado(s)", #fallbackCarpet))
-            for _, r in ipairs(fallbackCarpet) do table.insert(results, r) end
-        end
-    end
 
     if type(results) == "table" and #results > 0 then
         found = true
