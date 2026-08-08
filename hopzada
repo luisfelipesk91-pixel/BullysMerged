@@ -137,14 +137,38 @@ do
         local ok, result = pcall(function()
             return require(parent:WaitForChild(name, 2))
         end)
+        if ok and result then
+            print(string.format("[✅ HOP] %s carregado com sucesso", name))
+        else
+            print(string.format("[❌ HOP] Falha ao carregar %s", name))
+        end
         return ok and result or nil
     end
+    print("[🔧 HOP] Carregando módulos do jogo...")
     local ok_pkg, Packages = pcall(function() return RS:WaitForChild("Packages", 2) end)
     local ok_dat, Datas    = pcall(function() return RS:WaitForChild("Datas", 2) end)
     local ok_sh,  Shared   = pcall(function() return RS:WaitForChild("Shared", 2) end)
-    if ok_pkg and Packages then Synchronizer  = tryLoad(Packages, "Synchronizer") end
-    if ok_dat and Datas    then AnimalsData   = tryLoad(Datas,    "Animals")      end
-    if ok_sh  and Shared   then AnimalsShared = tryLoad(Shared,   "Animals")      end
+    if ok_pkg and Packages then 
+        Synchronizer  = tryLoad(Packages, "Synchronizer") 
+    else
+        print("[❌ HOP] ReplicatedStorage.Packages não encontrado")
+    end
+    if ok_dat and Datas    then 
+        AnimalsData   = tryLoad(Datas,    "Animals")      
+    else
+        print("[❌ HOP] ReplicatedStorage.Datas não encontrado")
+    end
+    if ok_sh  and Shared   then 
+        AnimalsShared = tryLoad(Shared,   "Animals")      
+    else
+        print("[❌ HOP] ReplicatedStorage.Shared não encontrado")
+    end
+    
+    if Synchronizer and AnimalsData and AnimalsShared then
+        print("[✅ HOP] Todos os módulos carregados - Sistema pronto!")
+    else
+        print("[⚠️ HOP] Alguns módulos falharam ao carregar - Scanner pode não funcionar")
+    end
 end
 
 local function parseValue(text)
@@ -288,13 +312,54 @@ local function isPlotOwnerInDuel(plot, duelPlayers)
 end
 
 local function scanPlots(duelPlayers, seen, currentJobId)
-    local results = {}
-    local plots = Workspace:FindFirstChild("Plots")
-    if not plots then return results end
+    print("[🔍 HOP SCAN] Iniciando scan de plots...")
+    print("[DEBUG] Aguardando Workspace.Plots carregar...")
     
-    for _, plot in ipairs(plots:GetChildren()) do
+    local results = {}
+    local plots = Workspace:WaitForChild("Plots", 10)  -- Espera até 10 segundos
+    
+    if not plots then 
+        print("[❌ HOP SCAN] Workspace.Plots não carregou em 10 segundos")
+        return results 
+    end
+    
+    print("[✅ HOP SCAN] Workspace.Plots carregado!")
+    local plotList = plots:GetChildren()
+    print(string.format("[📊 HOP SCAN] Total de plots encontrados: %d", #plotList))
+    
+    if not Synchronizer then
+        print("[❌ HOP SCAN] Synchronizer não está carregado - scanner não pode funcionar")
+        return results
+    end
+    
+    local plotsScanned = 0
+    local plotsWithSync = 0
+    local plotsWithPets = 0
+    local totalPets = 0
+    local qualifyingPets = 0
+    
+    for _, plot in ipairs(plotList) do
+        plotsScanned = plotsScanned + 1
+        
+        -- Debug: mostrar informações do plot
+        if plotsScanned <= 3 then
+            print(string.format("[DEBUG PLOT %d] Name: %s | ClassName: %s", plotsScanned, plot.Name, plot.ClassName))
+        end
+        
         local ok, pot = pcall(function() return Synchronizer:Get(plot.Name) end)
-        if not ok or not pot then continue end
+        
+        if plotsScanned <= 3 then
+            print(string.format("[DEBUG PLOT %d] pcall ok: %s | pot: %s", plotsScanned, tostring(ok), tostring(pot)))
+        end
+        
+        if not ok or not pot then 
+            if plotsScanned <= 3 then
+                print(string.format("[⚠️ HOP SCAN] Plot %d (%s): Falha ao obter Synchronizer", plotsScanned, plot.Name))
+            end
+            continue 
+        end
+        
+        plotsWithSync = plotsWithSync + 1
         
         local ok2, list = pcall(function() return pot:Get("AnimalList") end)
         if not ok2 or type(list) ~= "table" then continue end
@@ -619,6 +684,16 @@ end
 
 local function sendWebhook(url, name, value, mutation, allResults, showFields, footer, ownerName, jobId, includeJoinLink, inDuel)
     if not url or url == "" then return end
+    
+    -- Debug simples
+    local wtype = "?"
+    if url == WEBHOOK_URL then wtype = "JOB_ID"
+    elseif url == WEBHOOK_ULTRA then wtype = "ULTRA"
+    elseif url == WEBHOOK_HIGH then wtype = "HIGH"
+    elseif url == WEBHOOK_MID then wtype = "MID"
+    end
+    print("[WEBHOOK] Sending to " .. wtype .. " | Pet: " .. name)
+    
     local imageUrl = getBrainrotImage(name)
     local joinLink = "https://liphyrdev.github.io/notifier/?placeId=109983668079237&gameInstanceId=" .. (jobId or CURRENT_JOB)
     local mutEmoji = getMutEmoji(mutation):gsub("%s+$", "")
@@ -702,6 +777,7 @@ end
             Body = HttpService:JSONEncode({ username = NOTIFIER_NAME, flags = 32768, components = components })
         })
     end)
+    print("[WEBHOOK] Sent to " .. wtype)
 end
 
 local function sendToRailwayAPI(name, jobId, genText, value, key, ownerName, currentPlayers, maxPlayers, placeId)
@@ -991,7 +1067,11 @@ end
 local detectedJobId = game.JobId
 local found = false
 
+print("[DEBUG] Verificando Synchronizer...")
+print("[DEBUG] Synchronizer existe?", Synchronizer ~= nil)
+
 if Synchronizer then
+    print("[DEBUG] Synchronizer OK - iniciando scan")
     local duelPlayers = getDuelPlayers()
     local seen = {}
     local results = scanPlots(duelPlayers, seen, detectedJobId)
@@ -1020,6 +1100,8 @@ if Synchronizer then
         if best then
             -- Railway primeiro (server.js recebe antes), Discord depois
             task.spawn(function()
+                print("[BRAINROT] Found:", best.name, "Value:", best.value, "Owner:", best.ownerName)
+                
                 sendToRailwayAPI(best.name, detectedJobId, best.gen, best.value, getUserKey(), best.ownerName, #Players:GetPlayers(), Players.MaxPlayers, PLACE_ID)
 
                 sendWebhook(WEBHOOK_URL, best.name, best.value, best.mutation, results, true, "Bob Notify", best.ownerName, detectedJobId, true, best.inDuel)
@@ -1028,16 +1110,24 @@ if Synchronizer then
                 local bestNameClean = best.name:gsub("%s*%(carpet%)%s*$", ""):lower()
                 for _, u in ipairs(ULTRA_BRAINROTS) do if u ~= "" and bestNameClean == u:lower() then isUltraName = true; break end end
 
+                print("[TIER] Value:", best.value, "isUltra:", isUltraName)
+                
                 if best.value >= 1e9 or isUltraName then
+                    print("[SENDING] ULTRA webhook")
                     sendWebhook(WEBHOOK_ULTRA, best.name, best.value, best.mutation, results, false, "Ultra", best.ownerName, detectedJobId, false, best.inDuel)
                 elseif best.value >= 100e6 then
+                    print("[SENDING] HIGH webhook")
                     sendWebhook(WEBHOOK_HIGH, best.name, best.value, best.mutation, results, false, "High", best.ownerName, detectedJobId, false, best.inDuel)
                 else
+                    print("[SENDING] MID webhook")
                     sendWebhook(WEBHOOK_MID, best.name, best.value, best.mutation, results, false, "Mid", best.ownerName, detectedJobId, false, best.inDuel)
                 end
+                
+                print("[WEBHOOKS] All webhooks sent successfully!")
             end)
 
             print("✅ Sucesso:", best.name, "| Owner:", best.ownerName, "|", best.gen)
+            task.wait(2)  -- Espera 2 segundos para garantir que os webhooks foram enviados
             startInfiniteHop(best.name)
         end
     end
