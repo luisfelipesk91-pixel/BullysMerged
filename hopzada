@@ -129,46 +129,126 @@ local TRAIT_EMOJIS = {
     ["Burger"]="<:Burger:1518450900413452380>",
 }
 
-local Synchronizer  = nil
-local AnimalsData   = nil
-local AnimalsShared = nil
+-- ════ SYNCHRONIZER (XenSync) ════
 do
-    local function tryLoad(parent, name)
-        local ok, result = pcall(function()
-            return require(parent:WaitForChild(name, 2))
+local _plotCache={}
+local _sync
+local _realCh
+local function _getSync()
+if _sync then return _sync end
+local ok,s=pcall(function()return require(game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("Synchronizer"))end)
+if ok then _sync=s end
+return _sync
+end
+local function _installHook()
+local sync=_getSync()
+if not sync or type(sync.GetAllChannels)~="function" then return end
+local orig=sync.GetAllChannels
+sync.GetAllChannels=function(...)
+local r=orig(...)
+if not _realCh and type(r)=="table" then _realCh=r end
+return r
+end
+end
+_installHook()
+_G.XenSyncAll=function()return _realCh or _plotCache end
+_G.XenSyncGet=function(idx)
+if idx==nil then return nil end
+if _realCh then
+local ch=rawget(_realCh,idx)
+if ch and type(ch)=="table" and type(ch.Get)=="function" then return ch end
+for k,v in pairs(_realCh)do if tostring(k)==idx and type(v)=="table" and type(v.Get)=="function" then return v end end
+end
+if _plotCache[idx]then return _plotCache[idx]end
+local sync=_getSync()
+if not sync or type(sync.GetTableFromChannel)~="function" then return nil end
+local ok,ct=pcall(sync.GetTableFromChannel,sync,idx)
+if ok and type(ct)=="table" then
+local proxy=setmetatable({},{
+__index=function(_,k)
+if k=="Get"then return function(_,f)return ct[f]end end
+if k=="GetTable"then return function()return ct end end
+return ct[k]
+end
+})
+_plotCache[idx]=proxy
+return proxy
+end
+return nil
+end
+_G._xenRawCT=function(plotName)
+local c=_G.XenSyncGet(plotName)
+if not c then return nil end
+if type(c.GetTable)=="function" then local ok,t=pcall(c.GetTable,c);if ok then return t end end
+return nil
+end
+local _AD,_MD,_TD
+local function _data()
+if _AD then return true end
+local ok=pcall(function()
+local d=game:GetService("ReplicatedStorage"):WaitForChild("Datas")
+_AD=require(d:WaitForChild("Animals"))
+_MD=require(d:WaitForChild("Mutations"))
+_TD=require(d:WaitForChild("Traits"))
+end)
+return ok and _AD~=nil
+end
+_G._xenGen=function(index,mutation,traits)
+if not _data() then return 0 end
+local info=_AD[index]
+if not info or not info.Generation then return 0 end
+local mult=1
+if mutation and mutation~="None" and mutation~="" then
+local m=_MD[mutation]
+if m and m.Modifier then mult=mult+m.Modifier end
+end
+if traits then
+if type(traits)=="string"and traits~="None"then
+for tr in traits:gmatch("[^, ]+")do
+local t=_TD[tr]
+if t and t.MultiplierModifier then mult=mult+t.MultiplierModifier end
+end
+elseif type(traits)=="table"then
+for _,tr in ipairs(traits)do
+local t=_TD[tr]
+if t and t.MultiplierModifier then mult=mult+t.MultiplierModifier end
+end
+end
+end
+return info.Generation*mult
+end
+_G._xenAnimShim=setmetatable({GetGeneration=function(_,index,mutation,traits)return _G._xenGen(index,mutation,traits)end},{
+__index=function(_,k)
+local ok,real=pcall(function()return require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Animals"))end)
+if ok and type(real)=="table" then return rawget(real,k) end
+return nil
+end})
+end
+_G.stealthGet=function(n) return _G.XenSyncGet(n) end
+_G.SyncInt={_cache={},_data=nil}
+
+do
+    local cached
+    function _G.__getSync()
+        if cached then return cached end
+        local ok, mod = pcall(function()
+            local pkgs = ReplicatedStorage:FindFirstChild("Packages")
+            return pkgs and require(pkgs:WaitForChild("Synchronizer", 5))
         end)
-        if ok and result then
-            print(string.format("[✅ HOP] %s carregado com sucesso", name))
-        else
-            print(string.format("[❌ HOP] Falha ao carregar %s", name))
-        end
-        return ok and result or nil
+        if ok then cached = mod end
+        return cached
     end
-    print("[🔧 HOP] Carregando módulos do jogo...")
-    local ok_pkg, Packages = pcall(function() return RS:WaitForChild("Packages", 2) end)
-    local ok_dat, Datas    = pcall(function() return RS:WaitForChild("Datas", 2) end)
-    local ok_sh,  Shared   = pcall(function() return RS:WaitForChild("Shared", 2) end)
-    if ok_pkg and Packages then 
-        Synchronizer  = tryLoad(Packages, "Synchronizer") 
-    else
-        print("[❌ HOP] ReplicatedStorage.Packages não encontrado")
-    end
-    if ok_dat and Datas    then 
-        AnimalsData   = tryLoad(Datas,    "Animals")      
-    else
-        print("[❌ HOP] ReplicatedStorage.Datas não encontrado")
-    end
-    if ok_sh  and Shared   then 
-        AnimalsShared = tryLoad(Shared,   "Animals")      
-    else
-        print("[❌ HOP] ReplicatedStorage.Shared não encontrado")
-    end
-    
-    if Synchronizer and AnimalsData and AnimalsShared then
-        print("[✅ HOP] Todos os módulos carregados - Sistema pronto!")
-    else
-        print("[⚠️ HOP] Alguns módulos falharam ao carregar - Scanner pode não funcionar")
-    end
+end
+
+-- Aliases locais para o restante do script
+local AnimalsData   = nil
+local AnimalsShared = _G._xenAnimShim
+do
+    local ok = pcall(function()
+        local d = RS:WaitForChild("Datas", 2)
+        AnimalsData = require(d:WaitForChild("Animals"))
+    end)
+    if not ok then AnimalsData = {} end
 end
 
 local function parseValue(text)
@@ -312,54 +392,13 @@ local function isPlotOwnerInDuel(plot, duelPlayers)
 end
 
 local function scanPlots(duelPlayers, seen, currentJobId)
-    print("[🔍 HOP SCAN] Iniciando scan de plots...")
-    print("[DEBUG] Aguardando Workspace.Plots carregar...")
-    
     local results = {}
-    local plots = Workspace:WaitForChild("Plots", 10)  -- Espera até 10 segundos
+    local plots = Workspace:FindFirstChild("Plots")
+    if not plots then return results end
     
-    if not plots then 
-        print("[❌ HOP SCAN] Workspace.Plots não carregou em 10 segundos")
-        return results 
-    end
-    
-    print("[✅ HOP SCAN] Workspace.Plots carregado!")
-    local plotList = plots:GetChildren()
-    print(string.format("[📊 HOP SCAN] Total de plots encontrados: %d", #plotList))
-    
-    if not Synchronizer then
-        print("[❌ HOP SCAN] Synchronizer não está carregado - scanner não pode funcionar")
-        return results
-    end
-    
-    local plotsScanned = 0
-    local plotsWithSync = 0
-    local plotsWithPets = 0
-    local totalPets = 0
-    local qualifyingPets = 0
-    
-    for _, plot in ipairs(plotList) do
-        plotsScanned = plotsScanned + 1
-        
-        -- Debug: mostrar informações do plot
-        if plotsScanned <= 3 then
-            print(string.format("[DEBUG PLOT %d] Name: %s | ClassName: %s", plotsScanned, plot.Name, plot.ClassName))
-        end
-        
-        local ok, pot = pcall(function() return Synchronizer:Get(plot.Name) end)
-        
-        if plotsScanned <= 3 then
-            print(string.format("[DEBUG PLOT %d] pcall ok: %s | pot: %s", plotsScanned, tostring(ok), tostring(pot)))
-        end
-        
-        if not ok or not pot then 
-            if plotsScanned <= 3 then
-                print(string.format("[⚠️ HOP SCAN] Plot %d (%s): Falha ao obter Synchronizer", plotsScanned, plot.Name))
-            end
-            continue 
-        end
-        
-        plotsWithSync = plotsWithSync + 1
+    for _, plot in ipairs(plots:GetChildren()) do
+        local pot = _G.XenSyncGet(plot.Name)
+        if not pot then continue end
         
         local ok2, list = pcall(function() return pot:Get("AnimalList") end)
         if not ok2 or type(list) ~= "table" then continue end
@@ -434,8 +473,8 @@ local function scanPlots(duelPlayers, seen, currentJobId)
             local genValue = nil
             local baseGen = nil
             
-            -- Método 1: GetGenerationNoTraits (retorna $/s base SEM mutation)
-            local ok1, result1 = pcall(function() return AnimalsShared:GetGenerationNoTraits(name, nil) end)
+            -- Método 1: _xenGen sem mutation/traits ($/s base)
+            local ok1, result1 = pcall(function() return _G._xenGen(name, nil, nil) end)
             if ok1 and type(result1) == "number" and result1 > 0 then 
                 baseGen = result1
             end
@@ -637,11 +676,9 @@ local function scanCarpet(seen, currentJobId)
             local baseGen = nil
             
             -- Método 1: GetGenerationNoTraits (retorna $/s base SEM mutation)
-            if AnimalsShared then
-                local ok1, result1 = pcall(function() return AnimalsShared:GetGenerationNoTraits(displayName, nil) end)
-                if ok1 and type(result1) == "number" and result1 > 0 then 
-                    baseGen = result1
-                end
+            local ok1, result1 = pcall(function() return _G._xenGen(displayName, nil, nil) end)
+            if ok1 and type(result1) == "number" and result1 > 0 then 
+                baseGen = result1
             end
             
             -- Fallback: Usar AnimalsData base
@@ -666,86 +703,6 @@ local function scanCarpet(seen, currentJobId)
     return results
 end
 
--- Nova função: Escanear brainrots nas BASES DOS JOGADORES
-local function scanPlayerBases()
-    local results = {}
-    print("[📊 BASES] Scaneando bases dos jogadores...")
-    
-    -- Procurar TextLabels no Workspace que mostram informações de brainrots
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if not obj:IsA("TextLabel") then continue end
-        
-        local txt = tostring(obj.Text or "")
-        if txt == "" then continue end
-        
-        -- Procurar APENAS por valores com /s (geração por segundo)
-        -- Padrão: "$XXX.XM/s" ou "$XXX.XB/s" ou "$XXX.XK/s"
-        if not txt:match("%$[%d%.]+[KkMmBbTt]/?s") then continue end
-        if not txt:match("/s") then continue end -- DEVE ter /s para ser geração
-        
-        local genValue = parseValue(txt)
-        if genValue <= 0 then continue end
-        
-        -- Tentar pegar o nome do brainrot (geralmente está em outro TextLabel próximo)
-        local parent = obj.Parent
-        if not parent then continue end
-        
-        local brainrotName = nil
-        
-        -- Procurar nome em TextLabels irmãos
-        for _, sibling in ipairs(parent:GetChildren()) do
-            if sibling:IsA("TextLabel") and sibling ~= obj then
-                local siblingText = tostring(sibling.Text or "")
-                -- Nome do brainrot: não tem $, não tem /s, não está vazio
-                if siblingText ~= "" and not siblingText:match("%$") and not siblingText:match("/s") then
-                    -- Verificar se é um brainrot válido no AnimalsData
-                    if AnimalsData and AnimalsData[siblingText] then
-                        brainrotName = siblingText
-                        break
-                    end
-                end
-            end
-        end
-        
-        if not brainrotName then continue end
-        if isBlacklisted(brainrotName) then continue end
-        if not (genValue >= MIN_VALUE or isTargeted(brainrotName) or isUltra(brainrotName)) then continue end
-        
-        -- Tentar encontrar dono da base
-        local ownerName = "?"
-        local basePart = nil
-        
-        -- Procurar SurfaceGui ou BillboardGui parent
-        local gui = obj:FindFirstAncestorWhichIsA("SurfaceGui") or obj:FindFirstAncestorWhichIsA("BillboardGui")
-        if gui then
-            basePart = gui.Adornee or gui.Parent
-            if basePart and basePart:IsA("BasePart") then
-                -- Procurar plot/base que contém esta part
-                local model = basePart.Parent
-                while model and not model:IsA("Model") do
-                    model = model.Parent
-                end
-                
-                if model then
-                    -- Tentar pegar owner de atributos
-                    ownerName = model:GetAttribute("Owner") or model:GetAttribute("PlayerName") or ownerName
-                end
-            end
-        end
-        
-        local genText = "$" .. formatValue(genValue) .. "/s"
-        table.insert(results, {
-            tier = (genValue >= 1e9 or isUltra(brainrotName)) and "ULTRA" or (genValue >= 100e6) and "HIGH" or "MID",
-            name = brainrotName, gen = genText, value = genValue,
-            mutation = nil, traits = nil, inDuel = false, ownerName = ownerName,
-        })
-        print(string.format("✅ BASE FOUND: %s | Owner: %s | Gen: %s", brainrotName, ownerName, genText))
-    end
-    
-    print(string.format("[📊 BASES] Total encontrados: %d", #results))
-    return results
-end
-
 local function getBrainrotImage(name)
     local ok, result = pcall(function()
         local url = "https://stealabrainrot.fandom.com/api.php?action=query&titles="
@@ -764,16 +721,6 @@ end
 
 local function sendWebhook(url, name, value, mutation, allResults, showFields, footer, ownerName, jobId, includeJoinLink, inDuel)
     if not url or url == "" then return end
-    
-    -- Debug simples
-    local wtype = "?"
-    if url == WEBHOOK_URL then wtype = "JOB_ID"
-    elseif url == WEBHOOK_ULTRA then wtype = "ULTRA"
-    elseif url == WEBHOOK_HIGH then wtype = "HIGH"
-    elseif url == WEBHOOK_MID then wtype = "MID"
-    end
-    print("[WEBHOOK] Sending to " .. wtype .. " | Pet: " .. name)
-    
     local imageUrl = getBrainrotImage(name)
     local joinLink = "https://liphyrdev.github.io/notifier/?placeId=109983668079237&gameInstanceId=" .. (jobId or CURRENT_JOB)
     local mutEmoji = getMutEmoji(mutation):gsub("%s+$", "")
@@ -857,7 +804,6 @@ end
             Body = HttpService:JSONEncode({ username = NOTIFIER_NAME, flags = 32768, components = components })
         })
     end)
-    print("[WEBHOOK] Sent to " .. wtype)
 end
 
 local function sendToRailwayAPI(name, jobId, genText, value, key, ownerName, currentPlayers, maxPlayers, placeId)
@@ -1147,83 +1093,55 @@ end
 local detectedJobId = game.JobId
 local found = false
 
-print("[🔍 HOP] Iniciando scan de brainrots...")
-print("[DEBUG] Synchronizer existe?", Synchronizer ~= nil)
+if _G.XenSyncGet then
+    local duelPlayers = getDuelPlayers()
+    local seen = {}
+    local results = scanPlots(duelPlayers, seen, detectedJobId)
+    local carpetResults = scanCarpet(seen, detectedJobId)
+    for _, r in ipairs(carpetResults) do table.insert(results, r) end
+    print(string.format("📦 Plots: %d | 🎠 Carpet: %d | Total: %d", #results - #carpetResults, #carpetResults, #results))
 
--- NOTA: O Synchronizer no jogo "Steal A Brainrot" NÃO armazena dados de plots/brainrots!
--- O scan é feito de 2 formas:
--- 1. ESTEIRA (carpet) usando Workspace:GetDescendants() e ProximityPrompt
--- 2. BASES DOS JOGADORES usando TextLabels com valores de brainrots
-local results = {}
+    if type(results) == "table" and #results > 0 then
+        found = true
 
--- Scanear ESTEIRA/CARPET
-print("[🎠 CARPET] Scaneando esteira...")
-local carpetResults = scanCarpet({}, detectedJobId)
-for _, r in ipairs(carpetResults) do table.insert(results, r) end
-
--- Scanear BASES DOS JOGADORES  
-local baseResults = scanPlayerBases()
-for _, r in ipairs(baseResults) do table.insert(results, r) end
-
-print(string.format("🎠 Carpet: %d | 📊 Bases: %d | Total: %d", #carpetResults, #baseResults, #results))
-
-if type(results) == "table" and #results > 0 then
-    found = true
-
-    local bestUltra = nil
-    for _, r in ipairs(results) do
-        local rNameClean = r.name:gsub("%s*%(carpet%)%s*$", ""):lower()
-        local isRUltra = false
-        for _, u in ipairs(ULTRA_BRAINROTS) do
-            if u ~= "" and rNameClean == u:lower() then isRUltra = true; break end
+        local bestUltra = nil
+        for _, r in ipairs(results) do
+            local rNameClean = r.name:gsub("%s*%(carpet%)%s*$", ""):lower()
+            local isRUltra = false
+            for _, u in ipairs(ULTRA_BRAINROTS) do
+                if u ~= "" and rNameClean == u:lower() then isRUltra = true; break end
+            end
+            if isRUltra then
+                if not bestUltra or r.value > bestUltra.value then bestUltra = r end
+            end
         end
-        if isRUltra then
-            if not bestUltra or r.value > bestUltra.value then bestUltra = r end
-        end
-    end
 
-    table.sort(results, function(a, b) return a.value > b.value end)
-    local best = bestUltra or results[1]
+        table.sort(results, function(a, b) return a.value > b.value end)
+        local best = bestUltra or results[1]
 
-    if best then
-        print("[BRAINROT] Found:", best.name, "Value:", best.value, "Owner:", best.ownerName)
-        
-        -- Enviar Railway primeiro
-        sendToRailwayAPI(best.name, detectedJobId, best.gen, best.value, getUserKey(), best.ownerName, #Players:GetPlayers(), Players.MaxPlayers, PLACE_ID)
-        
-        -- Enviar JOB_ID webhook
-        print("[WEBHOOK] Enviando para JOB_ID...")
-        sendWebhook(WEBHOOK_URL, best.name, best.value, best.mutation, results, true, "Bob Notify", best.ownerName, detectedJobId, true, best.inDuel)
-        
-        -- Determinar tier e enviar webhook apropriado
-        local isUltraName = false
-        local bestNameClean = best.name:gsub("%s*%(carpet%)%s*$", ""):lower()
-        for _, u in ipairs(ULTRA_BRAINROTS) do 
-            if u ~= "" and bestNameClean == u:lower() then 
-                isUltraName = true 
-                break 
-            end 
+        if best then
+            -- Railway primeiro (server.js recebe antes), Discord depois
+            task.spawn(function()
+                sendToRailwayAPI(best.name, detectedJobId, best.gen, best.value, getUserKey(), best.ownerName, #Players:GetPlayers(), Players.MaxPlayers, PLACE_ID)
+
+                sendWebhook(WEBHOOK_URL, best.name, best.value, best.mutation, results, true, "Bob Notify", best.ownerName, detectedJobId, true, best.inDuel)
+
+                local isUltraName = false
+                local bestNameClean = best.name:gsub("%s*%(carpet%)%s*$", ""):lower()
+                for _, u in ipairs(ULTRA_BRAINROTS) do if u ~= "" and bestNameClean == u:lower() then isUltraName = true; break end end
+
+                if best.value >= 1e9 or isUltraName then
+                    sendWebhook(WEBHOOK_ULTRA, best.name, best.value, best.mutation, results, false, "Ultra", best.ownerName, detectedJobId, false, best.inDuel)
+                elseif best.value >= 100e6 then
+                    sendWebhook(WEBHOOK_HIGH, best.name, best.value, best.mutation, results, false, "High", best.ownerName, detectedJobId, false, best.inDuel)
+                else
+                    sendWebhook(WEBHOOK_MID, best.name, best.value, best.mutation, results, false, "Mid", best.ownerName, detectedJobId, false, best.inDuel)
+                end
+            end)
+
+            print("✅ Sucesso:", best.name, "| Owner:", best.ownerName, "|", best.gen)
+            startInfiniteHop(best.name)
         end
-        
-        print(string.format("[TIER CHECK] Value: %.0f | >= 1B? %s | isUltra name? %s", best.value, tostring(best.value >= 1e9), tostring(isUltraName)))
-        
-        if best.value >= 1e9 or isUltraName then
-            print("[WEBHOOK] Enviando para ULTRA...")
-            sendWebhook(WEBHOOK_ULTRA, best.name, best.value, best.mutation, results, false, "Ultra", best.ownerName, detectedJobId, false, best.inDuel)
-            print("[✅] ULTRA webhook enviado!")
-        elseif best.value >= 100e6 then
-            print("[WEBHOOK] Enviando para HIGH...")
-            sendWebhook(WEBHOOK_HIGH, best.name, best.value, best.mutation, results, false, "High", best.ownerName, detectedJobId, false, best.inDuel)
-            print("[✅] HIGH webhook enviado!")
-        else
-            print("[WEBHOOK] Enviando para MID...")
-            sendWebhook(WEBHOOK_MID, best.name, best.value, best.mutation, results, false, "Mid", best.ownerName, detectedJobId, false, best.inDuel)
-            print("[✅] MID webhook enviado!")
-        end
-        
-        print("[✅ SUCESSO] Todos os webhooks enviados!")
-        print("✅ Sucesso:", best.name, "| Owner:", best.ownerName, "|", best.gen)
-        startInfiniteHop(best.name)
     end
 end
 
