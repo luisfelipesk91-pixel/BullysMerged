@@ -1067,69 +1067,77 @@ end
 local detectedJobId = game.JobId
 local found = false
 
-print("[DEBUG] Verificando Synchronizer...")
+print("[🔍 HOP] Iniciando scan de brainrots...")
 print("[DEBUG] Synchronizer existe?", Synchronizer ~= nil)
 
-if Synchronizer then
-    print("[DEBUG] Synchronizer OK - iniciando scan")
-    local duelPlayers = getDuelPlayers()
-    local seen = {}
-    local results = scanPlots(duelPlayers, seen, detectedJobId)
-    local carpetResults = scanCarpet(seen, detectedJobId)
-    for _, r in ipairs(carpetResults) do table.insert(results, r) end
-    print(string.format("📦 Plots: %d | 🎠 Carpet: %d | Total: %d", #results - #carpetResults, #carpetResults, #results))
+-- NOTA: O Synchronizer no jogo "Steal A Brainrot" NÃO armazena dados de plots/brainrots!
+-- O scan é feito pela ESTEIRA (carpet) usando Workspace:GetDescendants() e ProximityPrompt
+local results = {}
 
-    if type(results) == "table" and #results > 0 then
-        found = true
+-- Scanear ESTEIRA/CARPET (método principal)
+print("[🎠 CARPET] Scaneando esteira...")
+local carpetResults = scanCarpet({}, detectedJobId)
+for _, r in ipairs(carpetResults) do table.insert(results, r) end
 
-        local bestUltra = nil
-        for _, r in ipairs(results) do
-            local rNameClean = r.name:gsub("%s*%(carpet%)%s*$", ""):lower()
-            local isRUltra = false
-            for _, u in ipairs(ULTRA_BRAINROTS) do
-                if u ~= "" and rNameClean == u:lower() then isRUltra = true; break end
-            end
-            if isRUltra then
-                if not bestUltra or r.value > bestUltra.value then bestUltra = r end
-            end
+print(string.format("🎠 Carpet: %d | Total: %d", #carpetResults, #results))
+
+if type(results) == "table" and #results > 0 then
+    found = true
+
+    local bestUltra = nil
+    for _, r in ipairs(results) do
+        local rNameClean = r.name:gsub("%s*%(carpet%)%s*$", ""):lower()
+        local isRUltra = false
+        for _, u in ipairs(ULTRA_BRAINROTS) do
+            if u ~= "" and rNameClean == u:lower() then isRUltra = true; break end
         end
-
-        table.sort(results, function(a, b) return a.value > b.value end)
-        local best = bestUltra or results[1]
-
-        if best then
-            -- Railway primeiro (server.js recebe antes), Discord depois
-            task.spawn(function()
-                print("[BRAINROT] Found:", best.name, "Value:", best.value, "Owner:", best.ownerName)
-                
-                sendToRailwayAPI(best.name, detectedJobId, best.gen, best.value, getUserKey(), best.ownerName, #Players:GetPlayers(), Players.MaxPlayers, PLACE_ID)
-
-                sendWebhook(WEBHOOK_URL, best.name, best.value, best.mutation, results, true, "Bob Notify", best.ownerName, detectedJobId, true, best.inDuel)
-
-                local isUltraName = false
-                local bestNameClean = best.name:gsub("%s*%(carpet%)%s*$", ""):lower()
-                for _, u in ipairs(ULTRA_BRAINROTS) do if u ~= "" and bestNameClean == u:lower() then isUltraName = true; break end end
-
-                print("[TIER] Value:", best.value, "isUltra:", isUltraName)
-                
-                if best.value >= 1e9 or isUltraName then
-                    print("[SENDING] ULTRA webhook")
-                    sendWebhook(WEBHOOK_ULTRA, best.name, best.value, best.mutation, results, false, "Ultra", best.ownerName, detectedJobId, false, best.inDuel)
-                elseif best.value >= 100e6 then
-                    print("[SENDING] HIGH webhook")
-                    sendWebhook(WEBHOOK_HIGH, best.name, best.value, best.mutation, results, false, "High", best.ownerName, detectedJobId, false, best.inDuel)
-                else
-                    print("[SENDING] MID webhook")
-                    sendWebhook(WEBHOOK_MID, best.name, best.value, best.mutation, results, false, "Mid", best.ownerName, detectedJobId, false, best.inDuel)
-                end
-                
-                print("[WEBHOOKS] All webhooks sent successfully!")
-            end)
-
-            print("✅ Sucesso:", best.name, "| Owner:", best.ownerName, "|", best.gen)
-            task.wait(2)  -- Espera 2 segundos para garantir que os webhooks foram enviados
-            startInfiniteHop(best.name)
+        if isRUltra then
+            if not bestUltra or r.value > bestUltra.value then bestUltra = r end
         end
+    end
+
+    table.sort(results, function(a, b) return a.value > b.value end)
+    local best = bestUltra or results[1]
+
+    if best then
+        print("[BRAINROT] Found:", best.name, "Value:", best.value, "Owner:", best.ownerName)
+        
+        -- Enviar Railway primeiro
+        sendToRailwayAPI(best.name, detectedJobId, best.gen, best.value, getUserKey(), best.ownerName, #Players:GetPlayers(), Players.MaxPlayers, PLACE_ID)
+        
+        -- Enviar JOB_ID webhook
+        print("[WEBHOOK] Enviando para JOB_ID...")
+        sendWebhook(WEBHOOK_URL, best.name, best.value, best.mutation, results, true, "Bob Notify", best.ownerName, detectedJobId, true, best.inDuel)
+        
+        -- Determinar tier e enviar webhook apropriado
+        local isUltraName = false
+        local bestNameClean = best.name:gsub("%s*%(carpet%)%s*$", ""):lower()
+        for _, u in ipairs(ULTRA_BRAINROTS) do 
+            if u ~= "" and bestNameClean == u:lower() then 
+                isUltraName = true 
+                break 
+            end 
+        end
+        
+        print(string.format("[TIER CHECK] Value: %.0f | >= 1B? %s | isUltra name? %s", best.value, tostring(best.value >= 1e9), tostring(isUltraName)))
+        
+        if best.value >= 1e9 or isUltraName then
+            print("[WEBHOOK] Enviando para ULTRA...")
+            sendWebhook(WEBHOOK_ULTRA, best.name, best.value, best.mutation, results, false, "Ultra", best.ownerName, detectedJobId, false, best.inDuel)
+            print("[✅] ULTRA webhook enviado!")
+        elseif best.value >= 100e6 then
+            print("[WEBHOOK] Enviando para HIGH...")
+            sendWebhook(WEBHOOK_HIGH, best.name, best.value, best.mutation, results, false, "High", best.ownerName, detectedJobId, false, best.inDuel)
+            print("[✅] HIGH webhook enviado!")
+        else
+            print("[WEBHOOK] Enviando para MID...")
+            sendWebhook(WEBHOOK_MID, best.name, best.value, best.mutation, results, false, "Mid", best.ownerName, detectedJobId, false, best.inDuel)
+            print("[✅] MID webhook enviado!")
+        end
+        
+        print("[✅ SUCESSO] Todos os webhooks enviados!")
+        print("✅ Sucesso:", best.name, "| Owner:", best.ownerName, "|", best.gen)
+        startInfiniteHop(best.name)
     end
 end
 
