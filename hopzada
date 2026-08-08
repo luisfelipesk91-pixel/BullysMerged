@@ -666,6 +666,86 @@ local function scanCarpet(seen, currentJobId)
     return results
 end
 
+-- Nova função: Escanear brainrots nas BASES DOS JOGADORES
+local function scanPlayerBases()
+    local results = {}
+    print("[📊 BASES] Scaneando bases dos jogadores...")
+    
+    -- Procurar TextLabels no Workspace que mostram informações de brainrots
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if not obj:IsA("TextLabel") then continue end
+        
+        local txt = tostring(obj.Text or "")
+        if txt == "" then continue end
+        
+        -- Procurar APENAS por valores com /s (geração por segundo)
+        -- Padrão: "$XXX.XM/s" ou "$XXX.XB/s" ou "$XXX.XK/s"
+        if not txt:match("%$[%d%.]+[KkMmBbTt]/?s") then continue end
+        if not txt:match("/s") then continue end -- DEVE ter /s para ser geração
+        
+        local genValue = parseValue(txt)
+        if genValue <= 0 then continue end
+        
+        -- Tentar pegar o nome do brainrot (geralmente está em outro TextLabel próximo)
+        local parent = obj.Parent
+        if not parent then continue end
+        
+        local brainrotName = nil
+        
+        -- Procurar nome em TextLabels irmãos
+        for _, sibling in ipairs(parent:GetChildren()) do
+            if sibling:IsA("TextLabel") and sibling ~= obj then
+                local siblingText = tostring(sibling.Text or "")
+                -- Nome do brainrot: não tem $, não tem /s, não está vazio
+                if siblingText ~= "" and not siblingText:match("%$") and not siblingText:match("/s") then
+                    -- Verificar se é um brainrot válido no AnimalsData
+                    if AnimalsData and AnimalsData[siblingText] then
+                        brainrotName = siblingText
+                        break
+                    end
+                end
+            end
+        end
+        
+        if not brainrotName then continue end
+        if isBlacklisted(brainrotName) then continue end
+        if not (genValue >= MIN_VALUE or isTargeted(brainrotName) or isUltra(brainrotName)) then continue end
+        
+        -- Tentar encontrar dono da base
+        local ownerName = "?"
+        local basePart = nil
+        
+        -- Procurar SurfaceGui ou BillboardGui parent
+        local gui = obj:FindFirstAncestorWhichIsA("SurfaceGui") or obj:FindFirstAncestorWhichIsA("BillboardGui")
+        if gui then
+            basePart = gui.Adornee or gui.Parent
+            if basePart and basePart:IsA("BasePart") then
+                -- Procurar plot/base que contém esta part
+                local model = basePart.Parent
+                while model and not model:IsA("Model") do
+                    model = model.Parent
+                end
+                
+                if model then
+                    -- Tentar pegar owner de atributos
+                    ownerName = model:GetAttribute("Owner") or model:GetAttribute("PlayerName") or ownerName
+                end
+            end
+        end
+        
+        local genText = "$" .. formatValue(genValue) .. "/s"
+        table.insert(results, {
+            tier = (genValue >= 1e9 or isUltra(brainrotName)) and "ULTRA" or (genValue >= 100e6) and "HIGH" or "MID",
+            name = brainrotName, gen = genText, value = genValue,
+            mutation = nil, traits = nil, inDuel = false, ownerName = ownerName,
+        })
+        print(string.format("✅ BASE FOUND: %s | Owner: %s | Gen: %s", brainrotName, ownerName, genText))
+    end
+    
+    print(string.format("[📊 BASES] Total encontrados: %d", #results))
+    return results
+end
+
 local function getBrainrotImage(name)
     local ok, result = pcall(function()
         local url = "https://stealabrainrot.fandom.com/api.php?action=query&titles="
@@ -1071,15 +1151,21 @@ print("[🔍 HOP] Iniciando scan de brainrots...")
 print("[DEBUG] Synchronizer existe?", Synchronizer ~= nil)
 
 -- NOTA: O Synchronizer no jogo "Steal A Brainrot" NÃO armazena dados de plots/brainrots!
--- O scan é feito pela ESTEIRA (carpet) usando Workspace:GetDescendants() e ProximityPrompt
+-- O scan é feito de 2 formas:
+-- 1. ESTEIRA (carpet) usando Workspace:GetDescendants() e ProximityPrompt
+-- 2. BASES DOS JOGADORES usando TextLabels com valores de brainrots
 local results = {}
 
--- Scanear ESTEIRA/CARPET (método principal)
+-- Scanear ESTEIRA/CARPET
 print("[🎠 CARPET] Scaneando esteira...")
 local carpetResults = scanCarpet({}, detectedJobId)
 for _, r in ipairs(carpetResults) do table.insert(results, r) end
 
-print(string.format("🎠 Carpet: %d | Total: %d", #carpetResults, #results))
+-- Scanear BASES DOS JOGADORES  
+local baseResults = scanPlayerBases()
+for _, r in ipairs(baseResults) do table.insert(results, r) end
+
+print(string.format("🎠 Carpet: %d | 📊 Bases: %d | Total: %d", #carpetResults, #baseResults, #results))
 
 if type(results) == "table" and #results > 0 then
     found = true
