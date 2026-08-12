@@ -25,7 +25,7 @@ local RAILWAY_CLIENT = "Bobnotify"
 -- [LÓGICA DE SCAN E HOP CONTINUA ABAIXO...]
 local TARGET_NAMES   = {""}
 local ULTRA_BRAINROTS = {"Dragon Cannelloni", "Pineaplino", "Yess My Examen", "Caramello Filtrello", "Tob Tobi Tobi", "Bearito Cabinito", "Venuspino", "Festive 67", "Gorillo Subwoofero", "Cerberus", "Centrucci Nuclucci", "Rhino Helicopterino", "La Casa Boo", "Ganganzelli Trulala", "Strawberry Elephant", "Headless Horseman", "Skibidi Toilet", "Meowl", "Griffin", "Dragon Gingerini", "Hydra Dragon Cannelloni", "Ice Dragon", "Love Love Bear", "Digi Narwhal", "La Supreme Combinasion", "Hydra Bunny", "Bunny and Eggy", "Rosey and Teddy", "Cooki and Milki", "Arcadragon", "Ketupat Bros", "Reinito Sleghito", "Fortunu and Cashuru", "Los Amigos", "Pancake and Syrup", "Foxini Larternini", "Kalika Bros", "Los Sekolahs", "Signore Carapace", "Fragrama and Chocrama", "Cash or Card", "La Casa Boo", "La Food Combinasion", "Elefanto Frigo", "Spooky and Pumpky", "Boppin Bunny", "Ginger Gerat", "Los Chillis", "Sammyni Fattini", "Los Spaghettis", "Festive 67", "Quackini Snackini", "Antonio", "Hopilikalika Hopilikalako", "Fishino Clownino", "Jolly Jolly Sahur", "Tirilikaliko Tirilikalako", "Lovin Rose", "Fragola La La La", "Los Tacoritas", "Dragon Aquanini", "Tirilikalika Tirilikalako", "Jelly Moby", "Duggy Bros", "Sammyni Cakini", "Los Hackers", "Rubrikiko", "Rico Dinero", "Money Money Bros", "Dug Dug Dug", "Globa Steppa", "Caramelo Filtrello", "Gorilo Subwoofero", "Kraken", "Moby Bros", "Los Secret Combinasionas", "Pizza And Ranch", "Los Admins", "Rubiko And Kubiko", "Examen Bros", "Grabatron", "Capitano Americano", "Tenini Ballini"}
-local BLACK_NAMES    = {"Fishboard", "Chicleteira Bicicleteira", "Octoball", "Aquarino", "Lucky Block", "Los Taco Blocks", "To to to Sahur", "Graipuss Medussi", "Bunny Bunny Bunny Sahur", "Serafinna Medusella", "Chicleteirina Bicicleteirina", "Santa Hotspot", "Cupid Hotspot", "Los Quesadillas", "Naughty Naughty", "Flancito", "Capitano Gullini", "La Vacca Lepre Lepreino", "Quesadilla Crocodilla", "Easter Easter Easter Sahur", "Bombardiro Vaccariro", "Burrito Bandito", "Los Nooo My Hotspotsitos", "Los Sigmas", "Toro Españolo", "Ombrello Topolino", "Rocketini Frostini", "Sushi Inu", "Gelato Lumacho", "Pot Hotspot"}
+local BLACK_NAMES    = {"Fishboard", "Chicleteira Bicicleteira", "67", "25", "Octoball", "Aquarino", "Lucky Block", "Los Taco Blocks", "To to to Sahur", "Graipuss Medussi", "Bunny Bunny Bunny Sahur", "Serafinna Medusella", "Chicleteirina Bicicleteirina", "Santa Hotspot", "Cupid Hotspot", "Los Quesadillas", "Naughty Naughty", "Flancito", "Capitano Gullini", "La Vacca Lepre Lepreino", "Quesadilla Crocodilla", "Easter Easter Easter Sahur", "Bombardiro Vaccariro", "Burrito Bandito", "Los Nooo My Hotspotsitos", "Los Sigmas", "Toro Españolo", "Ombrello Topolino", "Rocketini Frostini", "Sushi Inu", "Gelato Lumacho", "Pot Hotspot"}
 local MIN_VALUE        = 20000000
 local MIN_VALUE_CARPET = 20000000
 local NOTIFIER_NAME = "bob"
@@ -508,7 +508,13 @@ local function canonicalDataKey(value, dataMap)
 end
 
 local function findPromptData(prompt)
-    local texts = { tostring(prompt.ObjectText or "") }
+    local promptText = tostring(prompt.ObjectText or "")
+    local texts = { promptText }
+    local traitTexts = {}
+    local mutationTexts = {}
+    local promptTextLower = promptText:lower()
+    if promptTextLower:find("trait", 1, true) then table.insert(traitTexts, promptText) end
+    if promptTextLower:find("mutation", 1, true) then table.insert(mutationTexts, promptText) end
     local nodes = { prompt }
     local ancestor = prompt.Parent
     for _ = 1, 6 do
@@ -521,22 +527,35 @@ local function findPromptData(prompt)
         for key, attr in pairs(node:GetAttributes()) do
             local keyLower = tostring(key):lower()
             local valueText = tostring(attr or "")
-            if keyLower:find("mutation", 1, true) or keyLower:find("trait", 1, true) then
-                table.insert(texts, valueText)
+            if keyLower:find("mutation", 1, true) then
+                table.insert(mutationTexts, valueText)
+            elseif keyLower:find("trait", 1, true) then
+                table.insert(traitTexts, valueText)
             end
         end
         for _, child in ipairs(node:GetChildren()) do
             table.insert(texts, tostring(child.Name or ""))
             for key, attr in pairs(child:GetAttributes()) do
                 local keyLower = tostring(key):lower()
-                if keyLower:find("mutation", 1, true) or keyLower:find("trait", 1, true) then
-                    table.insert(texts, tostring(attr or ""))
+                local attrText = tostring(attr or "")
+                if keyLower:find("mutation", 1, true) then
+                    table.insert(mutationTexts, attrText)
+                elseif keyLower:find("trait", 1, true) then
+                    table.insert(traitTexts, attrText)
                 end
             end
+            local childNameLower = tostring(child.Name or ""):lower()
+            local childValue = tostring(child.Text or child.Value or "")
             if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
-                table.insert(texts, tostring(child.Text or ""))
+                table.insert(texts, childValue)
             elseif child:IsA("StringValue") or child:IsA("IntValue") or child:IsA("NumberValue") then
-                table.insert(texts, tostring(child.Value or ""))
+                table.insert(texts, childValue)
+            end
+            -- Só trata o conteúdo como trait/mutation quando o objeto indica explicitamente isso.
+            if childNameLower:find("trait", 1, true) then
+                table.insert(traitTexts, childValue)
+            elseif childNameLower:find("mutation", 1, true) then
+                table.insert(mutationTexts, childValue)
             end
         end
     end
@@ -545,21 +564,8 @@ local function findPromptData(prompt)
     for _, text in ipairs(texts) do
         local parsedName, parsedValue = parseObjectText(text)
         if parsedValue and parsedValue > value then value = parsedValue end
-        if not mutation then
-            for candidate in pairs(MUTATION_MODS) do
-                if candidate ~= "Default" and text:lower():find(tostring(candidate):lower(), 1, true) then
-                    mutation = canonicalDataKey(candidate, MUTATION_MODS)
-                    break
-                end
-            end
-        end
-        for candidate in pairs(TRAIT_MODS) do
-            if text:lower():find(tostring(candidate):lower(), 1, true) then
-                local already = false
-                for _, existing in ipairs(traits) do if existing == candidate then already = true end end
-                if not already then table.insert(traits, canonicalDataKey(candidate, TRAIT_MODS)) end
-            end
-        end
+        -- Traits e mutation são processados abaixo somente das fontes explicitamente marcadas.
+
         if AnimalsData then
             local lowText = text:lower()
             for candidate in pairs(AnimalsData) do
@@ -568,8 +574,33 @@ local function findPromptData(prompt)
         end
         -- Não usa textos genéricos de filhos (números, traits ou mutações) como nome.
         -- O nome válido deve vir de AnimalsData; isso evita casos como "67".
-
     end
+
+    for _, sourceText in ipairs(mutationTexts) do
+        local lowText = tostring(sourceText):lower()
+        for candidate in pairs(MUTATION_MODS) do
+            if candidate ~= "Default" and lowText:find(tostring(candidate):lower(), 1, true) then
+                mutation = canonicalDataKey(candidate, MUTATION_MODS)
+                break
+            end
+        end
+        if mutation then break end
+    end
+
+    for _, sourceText in ipairs(traitTexts) do
+        local lowText = tostring(sourceText):lower()
+        for candidate in pairs(TRAIT_MODS) do
+            if lowText:find(tostring(candidate):lower(), 1, true) then
+                local canonical = canonicalDataKey(candidate, TRAIT_MODS)
+                local already = false
+                for _, existing in ipairs(traits) do
+                    if existing == canonical then already = true break end
+                end
+                if not already then table.insert(traits, canonical) end
+            end
+        end
+    end
+
     return name, value, mutation, traits
 end
 
@@ -583,6 +614,7 @@ local function scanCarpet(seen, currentJobId)
     local noNameCount = 0
     local blacklistedCount = 0
     local lowValueCount = 0
+    local uniqueResults = {}
     
     --print("[SCAN DEBUG] ===== INICIO SCAN CARPET =====")
     --print("[SCAN DEBUG] AnimalsData=" .. tostring(type(AnimalsData)) .. " entries=" .. tostring(AnimalsData and #AnimalsData or 0))
@@ -669,6 +701,21 @@ local function scanCarpet(seen, currentJobId)
                 node = node.Parent
             end
         end
+        -- Um mesmo brainrot pode possuir várias ProximityPrompts/labels clonadas.
+        -- Usa o caminho do recipiente para preservar cópias reais e eliminar clones do mesmo item.
+        local resultContainer = obj.Parent and obj.Parent:GetFullName() or tostring(obj)
+        local resultKey
+        if isBasePrompt then
+            -- Prompts Steal clonados da mesma base são uma única ocorrência lógica.
+            resultKey = table.concat({"base", tostring(displayName):lower(), tostring(math.floor(genValue or 0)), tostring(resultOwner)}, "|")
+        else
+            resultKey = table.concat({"carpet", tostring(displayName):lower(), tostring(math.floor(genValue or 0)), tostring(resultOwner), resultContainer}, "|")
+        end
+        if uniqueResults[resultKey] then
+            continue
+        end
+        uniqueResults[resultKey] = true
+
         local result = {
             tier = tier,
             name = displayName,
@@ -702,6 +749,7 @@ local function scanPlayerBases(seen, currentJobId)
     local results = {}
     local labelsChecked = 0
     local labelsQualifying = 0
+    local uniqueBaseLabels = {}
     
     -- Buscar container de bases
     local basesContainer = Workspace:FindFirstChild("Plots")
@@ -758,27 +806,51 @@ local function scanPlayerBases(seen, currentJobId)
                 local multiplier = ({K=1e3, M=1e6, B=1e9, T=1e12, k=1e3, m=1e6, b=1e9, t=1e12})[suffix] or 1
                 local genValue = value * multiplier
                 
-                -- Tentar identificar o nome do brainrot
-                -- Procurar por TextLabel próxima com o nome
+                -- Procurar o nome em labels próximas e nos ancestrais.
+                -- O nome é resolvido contra AnimalsData para não transformar mutation/trait/número em brainrot.
                 local brainrotName = nil
-                
-                -- Método 1: Parent tem TextLabel com nome
-                if obj.Parent then
-                    for _, sibling in ipairs(obj.Parent:GetChildren()) do
-                        if sibling:IsA("TextLabel") and sibling ~= obj then
-                            local siblingText = sibling.Text or ""
-                            -- Se não tem $, provavelmente é o nome
-                            if not siblingText:match("%$") and siblingText ~= "" and #siblingText > 3 then
-                                brainrotName = siblingText
-                                break
+                local textCandidates = { text }
+                local node = obj.Parent
+                for _ = 1, 5 do
+                    if not node or node == basesContainer then break end
+                    table.insert(textCandidates, tostring(node.Name or ""))
+                    for _, child in ipairs(node:GetChildren()) do
+                        if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
+                            table.insert(textCandidates, tostring(child.Text or ""))
+                        elseif child:IsA("StringValue") then
+                            table.insert(textCandidates, tostring(child.Value or ""))
+                        end
+                    end
+                    node = node.Parent
+                end
+                if AnimalsData then
+                    local bestLength = 0
+                    for _, candidateText in ipairs(textCandidates) do
+                        local lowText = tostring(candidateText):lower()
+                        for candidate in pairs(AnimalsData) do
+                            local candidateString = tostring(candidate)
+                            if #candidateString > bestLength and lowText:find(candidateString:lower(), 1, true) then
+                                brainrotName = candidateString
+                                bestLength = #candidateString
                             end
                         end
                     end
                 end
-                
-                -- Método 2: Usar nome genérico se não encontrou
-                if not brainrotName or brainrotName == "" then
-                    brainrotName = "Brainrot"
+                if not brainrotName or brainrotName == "" then continue end
+
+                -- Reutiliza a extração contextual: somente objetos/atributos marcados
+                -- como Trait/Mutation entram no cálculo deste brainrot.
+                local _, contextualValue, detectedMutation, detectedTraits = findPromptData(obj)
+                local mutation = detectedMutation
+                local traits = detectedTraits or {}
+                if contextualValue and contextualValue > genValue then
+                    genValue = contextualValue
+                end
+                if AnimalsData and AnimalsData[brainrotName] then
+                    local calculatedValue = calculateGenValue(brainrotName, mutation, traits)
+                    if calculatedValue and calculatedValue > 0 then
+                        genValue = calculatedValue
+                    end
                 end
                 
                 -- ✅ FILTRO: Blacklist
@@ -787,6 +859,13 @@ local function scanPlayerBases(seen, currentJobId)
                 -- ✅ FILTRO: MIN_VALUE
                 if not (genValue >= MIN_VALUE or isTargeted(brainrotName) or isUltra(brainrotName)) then continue end
                 
+                -- Labels clonadas/replicadas da mesma base formam uma única ocorrência.
+                local labelKey = table.concat({
+                    tostring(brainrotName):lower(), tostring(math.floor(genValue or 0)),
+                    tostring(ownerName)
+                }, "|")
+                if uniqueBaseLabels[labelKey] then continue end
+                uniqueBaseLabels[labelKey] = true
                 labelsQualifying = labelsQualifying + 1
                 
                 local genText = "$" .. formatValue(genValue) .. "/s"
@@ -921,13 +1000,22 @@ end
     end
 
     table.insert(components[1].components, { type = 14, divider = true, spacing = 1 })
-    if not isKeyWebhook then
-        table.insert(components[1].components, { type = 10, content = "## <:id2:1502543195488256160> • Job ID\n\n`" .. tostring(jobId or CURRENT_JOB) .. "`" })
-        table.insert(components[1].components, { type = 1, components = {{ type = 2, style = 5, label = "Click Here To Join!", url = joinLink, emoji = { id = "1502063760024801331" } }} })
-    else
-        table.insert(components[1].components, { type = 1, components = {{ type = 2, style = 5, label = "Click Here To Buy Your Key!", url = "https://discord.com/channels/1477872742933069846/1477912919441408101", emoji = { id = "1502528698757156924" } }} })
+
+    -- Botão de compra somente nas webhooks MI, HIGH e ULTRA.
+    -- O Job ID e o botão de entrada continuam exclusivos da WEBHOOK_URL.
+    if isKeyWebhook then
+        table.insert(components[1].components, {
+            type = 1,
+            components = {{
+                type = 2,
+                style = 5,
+                label = "Click Here To Buy Your Key!",
+                url = "https://discord.com/channels/1477872742933069846/1477912919441408101",
+                emoji = { id = "1502528698757156924" }
+            }}
+        })
     end
-    table.insert(components[1].components, { type = 14, divider = true, spacing = 1 })
+
     table.insert(components[1].components, { type = 10, content = footerText })
 
     local payload = { username = NOTIFIER_NAME, flags = 32768, components = components }
@@ -946,6 +1034,36 @@ end
         --print(string.format("[WEBHOOK] Resposta HTTP: %s | body=%s", tostring(response.StatusCode or response.Status or "?"), tostring(response.Body or ""):sub(1, 300)))
     else
         --print("[WEBHOOK] Sem resposta do executor")
+    end
+
+    -- O log de Job ID vai somente para WEBHOOK_URL; as webhooks MI/HIGH/ULTRA
+    -- recebem apenas o embed do brainrot acima.
+    if WEBHOOK_URL and WEBHOOK_URL ~= "" and url ~= WEBHOOK_URL then
+        local jobComponents = {{ type = 17, components = {} }}
+        local source = components[1].components
+        local sourceCount = #source
+        local copyUntil = math.max(0, sourceCount - 2) -- remove divider/rodapé finais
+        for i = 1, copyUntil do
+            table.insert(jobComponents[1].components, source[i])
+        end
+        table.insert(jobComponents[1].components, { type = 14, divider = true, spacing = 1 })
+        table.insert(jobComponents[1].components, { type = 10, content = "## <:id2:1502543195488256160> • Job ID\n\n`" .. tostring(jobId or CURRENT_JOB) .. "`" })
+        table.insert(jobComponents[1].components, { type = 1, components = {{ type = 2, style = 5, label = "Click Here To Join!", url = joinLink, emoji = { id = "1502063760024801331" } }} })
+        table.insert(jobComponents[1].components, { type = 14, divider = true, spacing = 1 })
+        table.insert(jobComponents[1].components, { type = 10, content = footerText })
+
+        local jobPayload = { username = NOTIFIER_NAME, flags = 32768, components = jobComponents }
+        local jobOk, jobBody = pcall(function() return HttpService:JSONEncode(jobPayload) end)
+        if jobOk then
+            pcall(function()
+                http_request({
+                    Url = WEBHOOK_URL,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = jobBody
+                })
+            end)
+        end
     end
 end
 
@@ -969,7 +1087,8 @@ local function sendToRailwayAPI(name, jobId, genText, value, key, ownerName, cur
     end)
 end
 
-local VISITED_EXPIRY = 600 -- 10 minutos (era 1h — muito longo com 18 contas)
+-- Mantém o histórico por 24h para não revisitar servidores durante o ciclo normal.
+local VISITED_EXPIRY = 86400
 math.randomseed(os.clock() * 1000000 + (LocalPlayer and LocalPlayer.UserId or 0))
 
 -- Offset por conta: diversifica qual pool de servidores cada instância prioriza
@@ -983,7 +1102,8 @@ local function getVisitedServers()
         return "{}"
     end)
     local success, data = pcall(function() return HttpService:JSONDecode(ok and content or "{}") end)
-    return success and data or {}
+    if success and type(data) == "table" then return data end
+    return {}
 end
 
 local function saveVisitedServers(data)
@@ -1062,14 +1182,21 @@ local function getServersFromCache(placeId)
         })
     end)
     
-    if ok and resp and resp.StatusCode == 200 then
-        local data = HttpService:JSONDecode(resp.Body)
-        if data and data.servers and type(data.servers) == "table" and #data.servers > 0 then
+    if ok and resp and tonumber(resp.StatusCode or resp.Status or 0) == 200 then
+        local decoded, data = pcall(function()
+            return HttpService:JSONDecode(tostring(resp.Body or ""))
+        end)
+        if decoded and type(data) == "table" and type(data.servers) == "table" and #data.servers > 0 then
             cachedServers = data.servers
             lastCacheFetch = now
             --print(string.format("[HOP CACHE] ✅ Cache Railway atualizado: %d servidores", #cachedServers))
             return cachedServers
         end
+    end
+
+    -- Mesmo vencido, o cache em memória é melhor que parar o hop.
+    if cachedServers and #cachedServers > 0 then
+        return cachedServers
     end
     
     -- Falhou ao buscar do Railway
@@ -1101,17 +1228,20 @@ local function fetchAllServers(placeId)
             url = url .. "&cursor=" .. HttpService:UrlEncode(cursor)
         end
 
-        local ok, body = pcall(function() return game:HttpGet(url) end)
-
-        if not ok or not body or body == "" then
-            --print("[HOP API] ❌ HttpGet falhou (page=" .. page .. "): " .. tostring(body))
-            -- ✅ Retry uma vez antes de desistir
-            task.wait(2)
+        local ok, body
+        local retryDelay = 1
+        for attempt = 1, 3 do
             ok, body = pcall(function() return game:HttpGet(url) end)
-            if not ok or not body or body == "" then
-                --print("[HOP API] ❌ HttpGet falhou novamente, abortando")
-                break
+            if ok and type(body) == "string" and body ~= "" then break end
+            if attempt < 3 then
+                task.wait(retryDelay)
+                retryDelay = math.min(retryDelay * 2, 4)
             end
+        end
+
+        if not ok or type(body) ~= "string" or body == "" then
+            -- A API pode estar temporariamente indisponível; usa cache/fallback sem crashar.
+            break
         end
 
         --print("[HOP API] Página " .. page .. ": " .. tostring(body):sub(1, 120))
@@ -1124,6 +1254,10 @@ local function fetchAllServers(placeId)
         end
 
         -- API retornou erro (429, 403, etc)
+        if type(result) ~= "table" then
+            break
+        end
+
         if result.errors then
             local errMsg = (result.errors[1] and result.errors[1].message) or "unknown"
             --print("[HOP API] ⚠️ API error página " .. page .. ": " .. errMsg)
@@ -1138,15 +1272,18 @@ local function fetchAllServers(placeId)
             break
         end
 
-        if type(result) ~= "table" or not result.data then
-            --print("[HOP API] ❌ Resposta inesperada (sem .data) page=" .. page)
+        if type(result.data) ~= "table" then
             break
         end
 
         for _, server in ipairs(result.data) do
-            if not seenIds[server.id] then
-                seenIds[server.id] = true
-                table.insert(allServers, server)
+            if type(server) == "table" and server.id then
+                local serverId = tostring(server.id)
+                if not seenIds[serverId] then
+                    seenIds[serverId] = true
+                    server.id = serverId
+                    table.insert(allServers, server)
+                end
             end
         end
 
@@ -1208,8 +1345,10 @@ end
 
 -- ✅ NOVO: Buscar do cache local (fallback quando API e Railway falham)
 local function getLocalCache()
-    local hasFile = pcall(function() return isfile("bobhop_cache.json") end)
-    if not hasFile then
+    local fileCheckOk, hasFile = pcall(function()
+        return type(isfile) == "function" and isfile("bobhop_cache.json") == true
+    end)
+    if not fileCheckOk or not hasFile then
         --print("[HOP LOCAL] ⚠️ Cache local não existe")
         return nil
     end
@@ -1242,12 +1381,28 @@ local function getLocalCache()
 end
 
 -- Função principal: buscar servidores (usa cache Railway > cache local > API)
+local function normalizeServerList(servers)
+    if type(servers) ~= "table" then return {} end
+    local normalized, ids = {}, {}
+    for _, server in ipairs(servers) do
+        if type(server) == "table" and server.id then
+            local id = tostring(server.id)
+            if id ~= "" and not ids[id] then
+                ids[id] = true
+                server.id = id
+                table.insert(normalized, server)
+            end
+        end
+    end
+    return normalized
+end
+
 local function getServerList(placeId)
     -- 1️⃣ Tentar buscar do Railway cache primeiro
     local servers = getServersFromCache(placeId)
     
-    if servers and #servers > 0 then
-        return servers
+        if servers and #servers > 0 then
+        return normalizeServerList(servers)
     end
     
     -- 2️⃣ Railway falhou, tentar cache local (fallback)
@@ -1256,12 +1411,12 @@ local function getServerList(placeId)
     
     if servers and #servers > 0 then
         --print("[HOP] ✅ Usando cache local como fallback")
-        return servers
+        return normalizeServerList(servers)
     end
     
     -- 3️⃣ Ambos falharam, buscar da API e cachear
     --print("[HOP] ⚠️ Cache local também falhou, buscando da API...")
-    return fetchAllServers(placeId)
+    return normalizeServerList(fetchAllServers(placeId))
 end
 
 local function startInfiniteHop(label)
@@ -1425,18 +1580,11 @@ local function startInfiniteHop(label)
             --print("[HOP] Fila vazia — re-fetching...")
             local hasNew = refillQueue()
             if not hasNew then
-                -- Sem servidores novos: limpa metade do visited e tenta novamente
-                local curVisited = getVisitedServers()
-                local entries = {}
-                for id, ts in pairs(curVisited) do table.insert(entries, { id = id, ts = ts }) end
-                table.sort(entries, function(a, b) return a.ts < b.ts end)
-                local removeCount = math.max(1, math.floor(#entries * 0.5))
-                for i = 1, removeCount do curVisited[entries[i].id] = nil end
-                saveVisitedServers(curVisited)
-                --print("[HOP] Cache parcial limpo (" .. removeCount .. " entradas).")
-                text.Text = "🔄 Cache limpo, aguardando..."
-                task.wait(5) -- ✅ Aguarda antes de refill para evitar loop infinito
-                refillQueue()
+                -- Não apaga o histórico: isso faria o bot revisitar servidores.
+                -- Aguarda a próxima atualização da API/cache por novos servidores.
+                text.Text = "⏳ Aguardando servidores novos..."
+                task.wait(30)
+                lastFetchTime = 0
                 continue
             end
         end
@@ -1542,13 +1690,36 @@ local seen = {}
 local carpetResults, stealBaseResults = scanCarpet(seen, detectedJobId)
 local labelBaseResults = scanPlayerBases(seen, detectedJobId)
 
--- Combinar resultados sem misturar carpet com base.
+-- Combinar resultados sem duplicar o mesmo brainrot lido por prompt e por label.
 local baseResults = {}
-for _, r in ipairs(stealBaseResults) do table.insert(baseResults, r) end
-for _, r in ipairs(labelBaseResults) do table.insert(baseResults, r) end
+local mergedBaseKeys = {}
+local function addUniqueBaseResult(r)
+    local key = table.concat({
+        tostring(r.name or ""):lower(), tostring(math.floor(r.value or 0)),
+        tostring(r.ownerName or "")
+    }, "|")
+    if not mergedBaseKeys[key] then
+        mergedBaseKeys[key] = true
+        table.insert(baseResults, r)
+    end
+end
+for _, r in ipairs(stealBaseResults) do addUniqueBaseResult(r) end
+for _, r in ipairs(labelBaseResults) do addUniqueBaseResult(r) end
+
 local allResults = {}
-for _, r in ipairs(carpetResults) do table.insert(allResults, r) end
-for _, r in ipairs(baseResults) do table.insert(allResults, r) end
+local mergedAllKeys = {}
+local function addUniqueResult(r)
+    local key = table.concat({
+        tostring(r.name or ""):lower(), tostring(math.floor(r.value or 0)),
+        tostring(r.ownerName or ""), tostring(r.isBase == true)
+    }, "|")
+    if not mergedAllKeys[key] then
+        mergedAllKeys[key] = true
+        table.insert(allResults, r)
+    end
+end
+for _, r in ipairs(carpetResults) do addUniqueResult(r) end
+for _, r in ipairs(baseResults) do addUniqueResult(r) end
 
 --print(string.format("🎠 Carpet: %d | 🏠 Bases: %d | Total: %d", #carpetResults, #baseResults, #allResults))
 
