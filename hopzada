@@ -1433,6 +1433,21 @@ local function getServerList(placeId)
     return normalizeServerList(fetchAllServers(placeId))
 end
 
+-- Fallback interno: deixa o matchmaking público do Roblox escolher um servidor.
+-- Não depende do Railway, cache local ou lista externa de Job IDs.
+local function internalPublicServerFallback(label)
+    label = tostring(label or "Bob Notifier")
+    text.Text = "🌐 Servidor público automático..."
+    local ok, err = pcall(function()
+        TeleportService:Teleport(PLACE_ID, LocalPlayer)
+    end)
+    if not ok then
+        text.Text = "⏳ Fallback público indisponível; tentando novamente..."
+        return false, err
+    end
+    return true
+end
+
 local function startInfiniteHop(label)
     label = tostring(label or "Bob Notifier")
     debugLog("HOP: startInfiniteHop iniciado; label=" .. label .. " currentJob=" .. tostring(game.JobId))
@@ -1607,9 +1622,13 @@ local function startInfiniteHop(label)
             if not hasNew then
                 -- Não apaga o histórico: isso faria o bot revisitar servidores.
                 -- Aguarda a próxima atualização da API/cache por novos servidores.
-                text.Text = "⏳ Aguardando servidores novos..."
-                task.wait(30)
-                lastFetchTime = 0
+                -- Último recurso: matchmaking público interno do Roblox.
+                -- Ele não exige a API e deixa o Roblox escolher um servidor público.
+                local fallbackOk, fallbackErr = internalPublicServerFallback(label)
+                if not fallbackOk then
+                    task.wait(30)
+                    lastFetchTime = 0
+                end
                 continue
             end
         end
