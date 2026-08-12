@@ -1108,10 +1108,15 @@ end
 
 local function saveVisitedServers(data)
     pcall(function()
-        if writefile then
+        if writefile and type(data) == "table" then
             writefile("visited_servers.json", HttpService:JSONEncode(data))
         end
     end)
+end
+
+local function visitedHas(visited, serverId)
+    local id = tostring(serverId or "")
+    return id ~= "" and visited[id] ~= nil
 end
 
 local screenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
@@ -1426,7 +1431,8 @@ local function startInfiniteHop(label)
     task.wait(0.3)
 
     local visited = getVisitedServers()
-    visited[game.JobId] = os.time()
+    -- O servidor atual também entra no histórico antes da primeira consulta.
+    visited[tostring(game.JobId)] = os.time()
     saveVisitedServers(visited)
 
     -- Fila local de candidatos: só chama a API quando esvaziar
@@ -1478,8 +1484,9 @@ local function startInfiniteHop(label)
                     
                     local scored = {}
                     for _, server in ipairs(localServers) do
-                        if server.id == game.JobId then continue end
-                        if curVisited[server.id] then continue end
+                        local serverId = tostring(server.id or "")
+                        if serverId == tostring(game.JobId) then continue end
+                        if visitedHas(curVisited, tostring(server.id or "")) then continue end
                         local score = scoreServer(server)
                         if score > 0 then
                             table.insert(scored, { server = server, score = score })
@@ -1489,8 +1496,9 @@ local function startInfiniteHop(label)
                     if #scored == 0 and #localServers > 0 then
                         --print("[HOP] Todos cheios — usando fallback (servidores menos lotados)")
                         for _, server in ipairs(localServers) do
-                            if server.id == game.JobId then continue end
-                            if curVisited[server.id] then continue end
+                            local serverId = tostring(server.id or "")
+                        if serverId == tostring(game.JobId) then continue end
+                            if visitedHas(curVisited, tostring(server.id or "")) then continue end
                             local playing = server.playing or 0
                             local score = math.max(1, 20 - playing) + math.random(0, 10)
                             table.insert(scored, { server = server, score = score })
@@ -1512,8 +1520,8 @@ local function startInfiniteHop(label)
                 
                 -- ✅ Se cache local também falhou, limpa visited e reseta
                 --print("[HOP] ⚠️ Cache local vazio — limpando cache visited")
-                saveVisitedServers({})
-                apiFails = 0  -- Reset para tentar novamente
+-- Mantém o histórico para nunca revisitar automaticamente.
+                apiFails = 0
             end
             
             task.wait(backoff)
@@ -1537,8 +1545,9 @@ local function startInfiniteHop(label)
 
         local scored = {}
         for _, server in ipairs(allServers) do
-            if server.id == game.JobId  then continue end
-            if curVisited[server.id]    then continue end
+            local serverId = tostring(server.id or "")
+            if serverId == tostring(game.JobId) then continue end
+            if visitedHas(curVisited, tostring(server.id or "")) then continue end
             local score = scoreServer(server)
             if score > 0 then
                 table.insert(scored, { server = server, score = score })
@@ -1549,8 +1558,9 @@ local function startInfiniteHop(label)
         if #scored == 0 and #allServers > 0 then
             --print("[HOP] Todos cheios — usando fallback (servidores menos lotados)")
             for _, server in ipairs(allServers) do
-                if server.id == game.JobId then continue end
-                if curVisited[server.id]   then continue end
+                local serverId = tostring(server.id or "")
+                        if serverId == tostring(game.JobId) then continue end
+                if visitedHas(curVisited, tostring(server.id or "")) then continue end
                 local playing = server.playing or 0
                 local score   = math.max(1, 20 - playing) + math.random(0, 10)
                 table.insert(scored, { server = server, score = score })
@@ -1608,12 +1618,14 @@ local function startInfiniteHop(label)
             continue
         end
 
-        -- Marcar como visitado
-        local curVisited = getVisitedServers()
-        curVisited[server.id] = os.time()
-        saveVisitedServers(curVisited)
-
         local serverId = tostring(server.id or "")
+        -- Última trava: uma fila antiga nunca pode enviar para um Job ID visitado.
+        local curVisited = getVisitedServers()
+        if visitedHas(curVisited, serverId) or serverId == tostring(game.JobId) then
+            continue
+        end
+        curVisited[serverId] = os.time()
+        saveVisitedServers(curVisited)
         local playing = tonumber(server.playing) or 0
         local maxPlayers = tonumber(server.maxPlayers) or 8
         text.Text = "📡 " .. label .. " → " .. string.sub(serverId, 1, 8)
@@ -1627,7 +1639,7 @@ local function startInfiniteHop(label)
 
         if not teleOk then
             --print("[HOP] ⚠️ Teleporte falhou: " .. tostring(err))
-            curVisited[server.id] = nil
+            curVisited[serverId] = nil
             saveVisitedServers(curVisited)
         end
 
