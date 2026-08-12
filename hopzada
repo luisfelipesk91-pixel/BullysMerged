@@ -32,6 +32,13 @@ local NOTIFIER_NAME = "bob"
 local CURRENT_JOB   = tostring(game.JobId)
 local PLACE_ID      = game.PlaceId
 local LocalPlayer = Players.LocalPlayer
+local DEBUG_MODE = false
+local function debugLog(message)
+    if DEBUG_MODE then
+        print("[BOB DEBUG] " .. tostring(message))
+    end
+end
+debugLog("BOOT: script carregado; JobId=" .. tostring(game.JobId) .. " PlaceId=" .. tostring(game.PlaceId))
 --print("Players: " .. tostring(#Players:GetPlayers()))
 
 local http_request = http_request or (syn and syn.request) or (http and http.request) or request
@@ -545,10 +552,12 @@ local function findPromptData(prompt)
                 end
             end
             local childNameLower = tostring(child.Name or ""):lower()
-            local childValue = tostring(child.Text or child.Value or "")
+            local childValue = ""
             if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
+                childValue = tostring(child.Text or "")
                 table.insert(texts, childValue)
             elseif child:IsA("StringValue") or child:IsA("IntValue") or child:IsA("NumberValue") then
+                childValue = tostring(child.Value or "")
                 table.insert(texts, childValue)
             end
             -- Só trata o conteúdo como trait/mutation quando o objeto indica explicitamente isso.
@@ -1426,11 +1435,15 @@ end
 
 local function startInfiniteHop(label)
     label = tostring(label or "Bob Notifier")
+    debugLog("HOP: startInfiniteHop iniciado; label=" .. label .. " currentJob=" .. tostring(game.JobId))
     --print("[HOP] Sistema iniciado...")
     if not game:IsLoaded() then game.Loaded:Wait() end
     task.wait(0.3)
 
     local visited = getVisitedServers()
+    local visitedCount = 0
+    for _ in pairs(visited) do visitedCount = visitedCount + 1 end
+    debugLog("HOP: histórico carregado; visitados=" .. tostring(visitedCount))
     -- O servidor atual também entra no histórico antes da primeira consulta.
     visited[tostring(game.JobId)] = os.time()
     saveVisitedServers(visited)
@@ -1456,6 +1469,7 @@ local function startInfiniteHop(label)
         lastFetchTime = os.time()
 
         local allServers = getServerList(PLACE_ID)
+        debugLog("HOP: lista recebida; servidores=" .. tostring(type(allServers) == "table" and #allServers or -1) .. "; apiFails=" .. tostring(apiFails))
         --print("[HOP] Pool total: " .. #allServers .. " servidores")
 
         if #allServers == 0 then
@@ -1577,6 +1591,7 @@ local function startInfiniteHop(label)
             end
         end
 
+        debugLog("HOP: candidatos novos na fila=" .. tostring(#candidateQueue) .. "; histórico=" .. tostring((function() local n=0 for _ in pairs(curVisited) do n=n+1 end return n end)()))
         --print("[HOP] Candidatos na fila: " .. #candidateQueue)
         return #candidateQueue > 0
     end
@@ -1619,9 +1634,11 @@ local function startInfiniteHop(label)
         end
 
         local serverId = tostring(server.id or "")
+        debugLog("HOP: candidato selecionado=" .. serverId)
         -- Última trava: uma fila antiga nunca pode enviar para um Job ID visitado.
         local curVisited = getVisitedServers()
         if visitedHas(curVisited, serverId) or serverId == tostring(game.JobId) then
+            debugLog("HOP: candidato bloqueado por já visitado/atual=" .. serverId)
             continue
         end
         curVisited[serverId] = os.time()
@@ -1633,11 +1650,13 @@ local function startInfiniteHop(label)
         --print("[HOP] → " .. serverId .. " | Players: " .. tostring(playing)
         --              .. "/" .. tostring(maxPlayers) .. " | Fila restante: " .. tostring(#candidateQueue))
 
+        debugLog("HOP: tentando teleport para=" .. serverId .. "; players=" .. tostring(playing) .. "/" .. tostring(maxPlayers))
         local teleOk, err = pcall(function()
             TeleportService:TeleportToPlaceInstance(PLACE_ID, server.id, LocalPlayer)
         end)
 
         if not teleOk then
+            debugLog("HOP: teleport falhou=" .. tostring(err))
             --print("[HOP] ⚠️ Teleporte falhou: " .. tostring(err))
             curVisited[serverId] = nil
             saveVisitedServers(curVisited)
@@ -1676,17 +1695,20 @@ local function waitForScanReady()
             end
         end
         if promptCount ~= lastPromptCount then
+            debugLog("READY: prompts ativos=" .. tostring(promptCount) .. "; AnimalsData=" .. tostring(AnimalsData and next(AnimalsData) ~= nil))
             --print(string.format("[SCAN READY] prompts ativos=%d AnimalsData=%s", promptCount, tostring(AnimalsData and next(AnimalsData) ~= nil)))
             lastPromptCount = promptCount
         end
 
         if promptCount > 0 and AnimalsData and next(AnimalsData) ~= nil then
             task.wait(1.5)
+            debugLog("READY: condições atendidas; iniciando scan")
             --print("[SCAN READY] Pronto; iniciando scan agora")
             return true
         end
         task.wait(1)
     end
+    debugLog("READY: timeout; executando scan com dados disponíveis")
     --print("[SCAN READY] Timeout; executando scan com os dados disponíveis")
     return false
 end
@@ -1699,8 +1721,11 @@ local found = false
 local duelPlayers = getDuelPlayers()
 local seen = {}
 
+debugLog("SCAN: iniciando carpet/base; job=" .. tostring(detectedJobId))
 local carpetResults, stealBaseResults = scanCarpet(seen, detectedJobId)
+debugLog("SCAN: carpet=" .. tostring(#carpetResults) .. "; stealBase=" .. tostring(#stealBaseResults))
 local labelBaseResults = scanPlayerBases(seen, detectedJobId)
+debugLog("SCAN: labelBase=" .. tostring(#labelBaseResults))
 
 -- Combinar resultados sem duplicar o mesmo brainrot lido por prompt e por label.
 local baseResults = {}
@@ -1733,6 +1758,7 @@ end
 for _, r in ipairs(carpetResults) do addUniqueResult(r) end
 for _, r in ipairs(baseResults) do addUniqueResult(r) end
 
+debugLog("SCAN: final carpet=" .. tostring(#carpetResults) .. "; bases=" .. tostring(#baseResults) .. "; total=" .. tostring(#allResults))
 --print(string.format("🎠 Carpet: %d | 🏠 Bases: %d | Total: %d", #carpetResults, #baseResults, #allResults))
 
 if type(allResults) == "table" and #allResults > 0 then
@@ -1753,7 +1779,8 @@ if type(allResults) == "table" and #allResults > 0 then
     table.sort(allResults, function(a, b) return a.value > b.value end)
     local best = bestUltra or allResults[1]
 
-    if best then
+        if best then
+        debugLog("RESULT: melhor=" .. tostring(best.name) .. "; value=" .. tostring(best.value) .. "; base=" .. tostring(best.isBase) .. "; carpet=" .. tostring(best.isCarpet))
         -- Envia primeiro e só inicia o hop depois que as requisições terminarem.
         -- O task.spawn anterior permitia que o teleporte interrompesse os webhooks.
         --print("[WEBHOOK FLOW] Iniciando envio antes do hop")
@@ -1785,6 +1812,7 @@ if type(allResults) == "table" and #allResults > 0 then
 end
 
 if not found then
+    debugLog("RESULT: nenhum resultado; iniciando hop sem webhook de brainrot")
     --print(string.format("[WEBHOOK DEBUG] Nenhum envio: allResults=%d; o bloco de webhook não foi executado", #allResults))
     --print("❌ Nenhum brainrot valioso encontrado")
     startInfiniteHop(nil)
