@@ -1100,6 +1100,8 @@ end
 local VISITED_EXPIRY = 86400
 math.randomseed(os.clock() * 1000000 + (LocalPlayer and LocalPlayer.UserId or 0))
 
+-- Offset por conta: diversifica qual pool de servidores cada instância prioriza
+local ACCOUNT_POOL_OFFSET = (LocalPlayer and LocalPlayer.UserId or 0) % 4
 
 local function getVisitedServers()
     local ok, content = pcall(function()
@@ -1139,139 +1141,264 @@ text.TextColor3 = Color3.new(1, 1, 1)
 text.TextScaled = true
 text.Font = Enum.Font.SourceSansBold
 
+-- Busca até 4 páginas alternando sortOrder — pool de ~400 servidores por rodada
+-- O ACCOUNT_POOL_OFFSET faz cada conta começar numa ordem diferente,
+-- então as 18 instâncias não disputam exatamente os mesmos servidores
 local function scoreServer(server)
     local playing    = server.playing    or 0
     local maxPlayers = server.maxPlayers
     if not maxPlayers or maxPlayers <= 0 then maxPlayers = 12 end
-    -- Só entra em servidores cheios (mínimo 5/8, máximo 6/8)
-    if playing < 5 then return -1 end
+    -- Só entra em servidores com no máximo 6 jogadores
     if playing > 6 then return -1 end
     local score
-    if    playing == 5 then score = 100
-    else                     score = 90  -- 6 players
+    if    playing <= 2 then score = 100
+    elseif playing <= 4 then score = 80
+    else                     score = 50  -- 5-6 players
     end
-    return score + math.random(0, 25)
+    return score + math.random(0, 35)
 end
 
 -- ════════════════════════════════════════════════════════════
--- SERVIDOR BUSCA DA API ROBLOX — INSTÂNCIAS SÓ LEEM DO RAILWAY
+-- CACHE COMPARTILHADO DE SERVIDORES (ANTI RATE LIMIT)
 -- ════════════════════════════════════════════════════════════
-local lastRailwayFetch = 0
-local railwayCachedServers = nil
-local RAILWAY_CACHE_TTL = 570  -- 9.5 min (server renova a cada 10 min)
-local MAX_SERVERS = 500  -- ✅ Pool de 500 servidores por rodada (reduz risco de 429 da API Roblox)
+-- Cache local com TTL de 120 segundos (2 minutos) + randomização
+local SERVER_CACHE_TTL = 120
+local lastCacheFetch = 0
+local cachedServers = nil
+local instanceRandomOffset = math.random(0, 30) -- Offset aleatório 0-30s por instância
 
--- ════════════════════════════════════════════════════════════
--- ANTI-COLISÃO: Locks compartilhados no Railway
--- Cada conta reserva o servidor que vai entrar (~60s de TTL).
--- As demais contas removem servidores lockados por outros.
--- ════════════════════════════════════════════════════════════
-local LOCK_TTL = 60  -- segundos que um lock permanece válido
-local lastLocksFetch = 0
-local sharedLocks = {}  -- { [serverId] = { lockedBy = UserId, lockedAt = os.time() } }
-
-local function fetchSharedLocks()
+-- Função para buscar servidores DO RAILWAY (cache compartilhado)
+local function getServersFromCache(placeId)
     local now = os.time()
-    -- Cache os locks por 15s: evita flood de GETs entre instâncias
-    if (now - lastLocksFetch) < 15 then return sharedLocks end
+    
+    -- TTL com offset aleatório para evitar todas instâncias expirarem juntas
+    local effectiveTTL = SERVER_CACHE_TTL - instanceRandomOffset
+    
+    -- Se tem cache local válido, usar
+    if cachedServers and (now - lastCacheFetch) < effectiveTTL then
+        --print(string.format("[HOP CACHE] ✅ Usando cache local (idade: %ds/%ds, %d servidores)", 
+            -- now - lastCacheFetch, effectiveTTL, #cachedServers))
+        return cachedServers
+    end
+    
+    -- Buscar do Railway
+    --print("[HOP CACHE] Buscando servidores do Railway...")
     local ok, resp = pcall(function()
         return http_request({
-            Url  = RAILWAY_API .. "/api/locks?placeId=" .. tostring(PLACE_ID),
-            Method  = "GET",
+            Url = RAILWAY_API .. "/api/servers/cache?placeId=" .. tostring(placeId),
+            Method = "GET",
             Headers = {
-                ["Content-Type"]  = "application/json",
-                ["X-Bob-Client"]  = RAILWAY_CLIENT,
-                ["X-Bob-Secret"]  = RAILWAY_SECRET,
+                ["Content-Type"] = "application/json",
+                ["Authorization"] = RAILWAY_SECRET,
+                ["X-Bob-Client"] = RAILWAY_CLIENT,
+                ["X-Bob-Secret"] = RAILWAY_SECRET
             }
         })
     end)
+    
     if ok and resp and tonumber(resp.StatusCode or resp.Status or 0) == 200 then
         local decoded, data = pcall(function()
-            return game:GetService("HttpService"):JSONDecode(tostring(resp.Body or ""))
+            return HttpService:JSONDecode(tostring(resp.Body or ""))
         end)
-        if decoded and type(data) == "table" and type(data.locks) == "table" then
-            sharedLocks = {}
-            local count = 0
-            for _, lk in ipairs(data.locks) do
-                if type(lk) == "table" and lk.serverId then
-                    local lockedAt = tonumber(lk.lockedAt) or 0
-                    -- Descarta locks expirados (TTL)
-                    if (now - lockedAt) < LOCK_TTL then
-                        sharedLocks[tostring(lk.serverId)] = {
-                            lockedBy = lk.lockedBy or 0,
-                            lockedAt = lockedAt,
-                        }
-                        count = count + 1
-                    end
+        if decoded and type(data) == "table" and type(data.servers) == "table" and #data.servers > 0 then
+            cachedServers = data.servers
+            lastCacheFetch = now
+            --print(string.format("[HOP CACHE] ✅ Cache Railway atualizado: %d servidores", #cachedServers))
+            return cachedServers
+        end
+    end
+
+    -- Mesmo vencido, o cache em memória é melhor que parar o hop.
+    if cachedServers and #cachedServers > 0 then
+        return cachedServers
+    end
+    
+    -- Falhou ao buscar do Railway
+    if ok and resp then
+        --print(string.format("[HOP CACHE] ⚠️ Railway respondeu %d - buscando da API Roblox...", resp.StatusCode))
+    else
+        --print("[HOP CACHE] ⚠️ Railway falhou - buscando da API Roblox...")
+    end
+    return nil
+end
+
+-- Função para buscar servidores DA API DO ROBLOX e salvar no Railway
+local function fetchAllServers(placeId)
+    local allServers = {}
+    local seenIds    = {}
+
+    local stagger = ACCOUNT_POOL_OFFSET * 0.5
+    if stagger > 0 then task.wait(stagger) end
+
+    local sortOrder = ACCOUNT_POOL_OFFSET % 2 == 0 and "Asc" or "Desc"
+    local cursor    = nil
+
+    --print("[HOP API] 🔍 Buscando servidores da API Roblox...")
+    
+    for page = 1, 2 do
+        local url = "https://games.roblox.com/v1/games/" .. placeId
+                    .. "/servers/Public?sortOrder=" .. sortOrder .. "&limit=100"
+        if cursor and cursor ~= "" then
+            url = url .. "&cursor=" .. HttpService:UrlEncode(cursor)
+        end
+
+        local ok, body
+        local retryDelay = 1
+        for attempt = 1, 3 do
+            ok, body = pcall(function() return game:HttpGet(url) end)
+            if ok and type(body) == "string" and body ~= "" then break end
+            if attempt < 3 then
+                task.wait(retryDelay)
+                retryDelay = math.min(retryDelay * 2, 4)
+            end
+        end
+
+        if not ok or type(body) ~= "string" or body == "" then
+            -- A API pode estar temporariamente indisponível; usa cache/fallback sem crashar.
+            break
+        end
+
+        --print("[HOP API] Página " .. page .. ": " .. tostring(body):sub(1, 120))
+
+        local parsed, result = pcall(function() return HttpService:JSONDecode(body) end)
+
+        if not parsed then
+            --print("[HOP API] ❌ JSON parse error (page=" .. page .. ")")
+            break
+        end
+
+        -- API retornou erro (429, 403, etc)
+        if type(result) ~= "table" then
+            break
+        end
+
+        if result.errors then
+            local errMsg = (result.errors[1] and result.errors[1].message) or "unknown"
+            --print("[HOP API] ⚠️ API error página " .. page .. ": " .. errMsg)
+            
+            -- ✅ Se for erro vazio (rate limit), aguarda mais tempo
+            if errMsg == "" or errMsg == "unknown" then
+                --print("[HOP API] ⚠️ Possível rate limit, aguardando 10s...")
+                if page == 1 then task.wait(10) end
+            else
+                if page == 1 then task.wait(5) end
+            end
+            break
+        end
+
+        if type(result.data) ~= "table" then
+            break
+        end
+
+        for _, server in ipairs(result.data) do
+            if type(server) == "table" and server.id then
+                local serverId = tostring(server.id)
+                if not seenIds[serverId] then
+                    seenIds[serverId] = true
+                    server.id = serverId
+                    table.insert(allServers, server)
                 end
             end
-            lastLocksFetch = now
-            print(string.format("[LOCK] 📋 %d locks ativos recebidos do Railway", count))
         end
+
+        cursor = result.nextPageCursor
+        if not cursor or cursor == "" then break end
+        task.wait(1)  -- ✅ Aumentado de 0.5s para 1s entre páginas
     end
-    return sharedLocks
-end
 
-local function notifyEntry(serverId, accountName)
-    -- Notifica o Railway/Discord que a conta entrou no servidor (Job ID)
-    pcall(function()
-        return http_request({
-            Url  = RAILWAY_API .. "/api/entered",
-            Method  = "POST",
-            Headers = {
-                ["Content-Type"]  = "application/json",
-                ["X-Bob-Client"]  = RAILWAY_CLIENT,
-                ["X-Bob-Secret"]  = RAILWAY_SECRET,
-            },
-            Body = game:GetService("HttpService"):JSONEncode({
-                account = tostring(accountName or LocalPlayer.Name or "???"),
-                jobId   = tostring(serverId),
-            })
-        })
+    -- ✅ NOVO: Salvar localmente como fallback (ANTES de tentar Railway)
+    local cacheData = {
+        servers = allServers,
+        timestamp = os.time(),
+        count = #allServers
+    }
+    
+    local saveOk = pcall(function()
+        writefile("bobhop_cache.json", HttpService:JSONEncode(cacheData))
     end)
-end
+    
+    if saveOk and #allServers > 0 then
+        --print(string.format("[HOP LOCAL] ✅ %d servidores salvos localmente", #allServers))
+    end
 
-local function lockMyServer(serverId)
-    local userId = (LocalPlayer and LocalPlayer.UserId or 0)
-    local ok, resp = pcall(function()
-        return http_request({
-            Url  = RAILWAY_API .. "/api/locks",
-            Method  = "POST",
-            Headers = {
-                ["Content-Type"]  = "application/json",
-                ["X-Bob-Client"]  = RAILWAY_CLIENT,
-                ["X-Bob-Secret"]  = RAILWAY_SECRET,
-            },
-            Body = game:GetService("HttpService"):JSONEncode({
-                placeId  = tostring(PLACE_ID),
-                serverId = tostring(serverId),
-                lockedBy = userId,
-                ttl      = LOCK_TTL,
+    -- Salvar no Railway se conseguiu buscar servidores
+    if #allServers > 0 then
+        --print(string.format("[HOP API] 💾 Salvando %d servidores no Railway...", #allServers))
+        local ok, resp = pcall(function()
+            return http_request({
+                Url = RAILWAY_API .. "/api/servers/cache",
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json",
+                    ["Authorization"] = RAILWAY_SECRET,
+                    ["X-Bob-Client"] = RAILWAY_CLIENT,
+                    ["X-Bob-Secret"] = RAILWAY_SECRET
+                },
+                Body = HttpService:JSONEncode({
+                    placeId = tostring(placeId),
+                    servers = allServers,
+                    ttl = SERVER_CACHE_TTL
+                })
             })
-        })
-    end)
-    local status = 0
-    if ok and resp then
-        status = tonumber(resp.StatusCode or resp.Status or 0)
-        if status >= 200 and status < 300 then
-            print("[LOCK] ✅ servidor reservado serverId=" .. tostring(serverId):sub(1, 8) .. " status=" .. tostring(status))
+        end)
+        
+        if ok and resp and resp.StatusCode == 200 then
+            --print("[HOP API] ✅ Cache salvo no Railway!")
+            cachedServers = allServers
+            lastCacheFetch = os.time()
         else
-            print(string.format("[LOCK] ⚠️ Railway retornou %d para /api/locks — locks não implementados no backend", status))
+            local status = (ok and resp) and resp.StatusCode or "erro"
+            --print("[HOP API] ⚠️ Falha ao salvar no Railway (status: " .. tostring(status) .. ")")
         end
     else
-        print("[LOCK] ❌ request ao Railway falhou — " .. tostring(resp))
+        --print("[HOP API] ⚠️ Nenhum servidor encontrado para cachear")
     end
-    -- Registra localmente na hora (funciona mesmo se o Railway estiver fora)
-    sharedLocks[tostring(serverId)] = { lockedBy = userId, lockedAt = os.time() }
+
+    return allServers
 end
 
--- ⚠️ FIX: normalizeServerList precisa estar ANTES de getServerList,
--- pois `local function` não é hoistado em Luau.
+-- ✅ NOVO: Buscar do cache local (fallback quando API e Railway falham)
+local function getLocalCache()
+    local fileCheckOk, hasFile = pcall(function()
+        return type(isfile) == "function" and isfile("bobhop_cache.json") == true
+    end)
+    if not fileCheckOk or not hasFile then
+        --print("[HOP LOCAL] ⚠️ Cache local não existe")
+        return nil
+    end
+    
+    local ok, data = pcall(function()
+        local content = readfile("bobhop_cache.json")
+        return HttpService:JSONDecode(content)
+    end)
+    
+    if not ok or not data or not data.servers then
+        --print("[HOP LOCAL] ⚠️ Erro ao ler cache local")
+        return nil
+    end
+    
+    local age = os.time() - (data.timestamp or 0)
+    local maxAge = 300  -- 5 minutos
+    
+    if age > maxAge then
+        --print(string.format("[HOP LOCAL] ⚠️ Cache local expirado (idade: %ds)", age))
+        return nil
+    end
+    
+    if data.count == 0 or #data.servers == 0 then
+        --print("[HOP LOCAL] ⚠️ Cache local vazio")
+        return nil
+    end
+    
+    --print(string.format("[HOP LOCAL] ✅ Cache local válido - %d servidores (idade: %ds)", data.count, age))
+    return data.servers
+end
+
+-- Função principal: buscar servidores (usa cache Railway > cache local > API)
 local function normalizeServerList(servers)
     if type(servers) ~= "table" then return {} end
     local normalized, ids = {}, {}
     for _, server in ipairs(servers) do
-        if MAX_SERVERS and #normalized >= MAX_SERVERS then break end
         if type(server) == "table" and server.id then
             local id = tostring(server.id)
             if id ~= "" and not ids[id] then
@@ -1285,79 +1412,29 @@ local function normalizeServerList(servers)
 end
 
 local function getServerList(placeId)
-    local now = os.time()
-
-    -- Cache local válido — não bate no Railway
-    if railwayCachedServers and (now - lastRailwayFetch) < RAILWAY_CACHE_TTL then
-        return normalizeServerList(railwayCachedServers)
+    -- 1️⃣ Tentar buscar do Railway cache primeiro
+    local servers = getServersFromCache(placeId)
+    
+        if servers and #servers > 0 then
+        return normalizeServerList(servers)
     end
-
-    -- Stagger por instância: evita 60 requests simultâneos ao Railway
-    local stagger = ((LocalPlayer and LocalPlayer.UserId or 0) % 30)
-    if stagger > 0 and lastRailwayFetch == 0 then
-        task.wait(stagger * 0.5)
+    
+    -- 2️⃣ Railway falhou, tentar cache local (fallback)
+    --print("[HOP] ⚠️ Railway indisponível, tentando cache local...")
+    servers = getLocalCache()
+    
+    if servers and #servers > 0 then
+        --print("[HOP] ✅ Usando cache local como fallback")
+        return normalizeServerList(servers)
     end
-
-    -- Tenta buscar do Railway (até 4 tentativas com backoff)
-    local retryDelay = 5
-    for attempt = 1, 4 do
-        local ok, resp = pcall(function()
-            return http_request({
-                Url  = RAILWAY_API .. "/api/servers/cache?placeId=" .. tostring(placeId) .. "&maxServers=" .. tostring(MAX_SERVERS),
-                Method  = "GET",
-                Headers = {
-                    ["Content-Type"]  = "application/json",
-                    ["X-Bob-Client"]  = RAILWAY_CLIENT,
-                    ["X-Bob-Secret"]  = RAILWAY_SECRET,
-                }
-            })
-        end)
-
-        if ok and resp then
-            local status = tonumber(resp.StatusCode or resp.Status or 0)
-
-            if status == 200 then
-                local decoded, data = pcall(function()
-                    return game:GetService("HttpService"):JSONDecode(tostring(resp.Body or ""))
-                end)
-                if decoded and type(data) == "table" and type(data.servers) == "table" and #data.servers > 0 then
-                    railwayCachedServers = data.servers
-                    lastRailwayFetch = now
-                    print(string.format("[HOP] ✅ %d servidores recebidos do Railway (tentativa %d)", #data.servers, attempt))
-                    return normalizeServerList(data.servers)
-                end
-
-            elseif status == 503 then
-                -- Railway ainda buscando da API Roblox — aguarda e tenta de novo
-                print(string.format("[HOP] ⏳ Railway buscando servidores... tentativa %d/%d (aguardando %ds)", attempt, 4, retryDelay))
-                text.Text = "⏳ Railway buscando servidores (" .. retryDelay .. "s)..."
-                task.wait(retryDelay)
-                retryDelay = math.min(retryDelay * 2, 30)
-
-            else
-                print(string.format("[HOP] ⚠️ Railway retornou %d na tentativa %d", status, attempt))
-                task.wait(retryDelay)
-                retryDelay = math.min(retryDelay * 2, 30)
-            end
-        else
-            print(string.format("[HOP] ⚠️ Request ao Railway falhou (tentativa %d): %s", attempt, tostring(resp)))
-            task.wait(retryDelay)
-            retryDelay = math.min(retryDelay * 2, 30)
-        end
-    end
-
-    -- Cache vencido ainda é melhor que nada
-    if railwayCachedServers and #railwayCachedServers > 0 then
-        print("[HOP] ⚠️ Usando cache local vencido como fallback")
-        return normalizeServerList(railwayCachedServers)
-    end
-
-    print("[HOP] ❌ Sem servidores disponíveis")
-    return {}
+    
+    -- 3️⃣ Ambos falharam, buscar da API e cachear
+    --print("[HOP] ⚠️ Cache local também falhou, buscando da API...")
+    return normalizeServerList(fetchAllServers(placeId))
 end
 
 -- Fallback interno: deixa o matchmaking público do Roblox escolher um servidor.
--- Não depende do Railway ou de lista externa de Job IDs.
+-- Não depende do Railway, cache local ou lista externa de Job IDs.
 local function internalPublicServerFallback(label)
     label = tostring(label or "Bob Notifier")
     text.Text = "🌐 Servidor público automático..."
@@ -1417,6 +1494,65 @@ local function startInfiniteHop(label)
             --print("[HOP] API falhou " .. apiFails .. "x — backoff " .. backoff .. "s")
             text.Text = "⏳ API temporariamente indisponível (" .. backoff .. "s)..."
             
+            -- ✅ CRÍTICO: Se falhar 3x seguidas, usa cache local como fallback
+            if apiFails >= 3 then
+                --print("[HOP] ⚠️ 3 falhas seguidas — tentando cache local...")
+                local localServers = getLocalCache()
+                
+                if localServers and #localServers > 0 then
+                    --print(string.format("[HOP] ✅ Usando %d servidores do cache local!", #localServers))
+                    apiFails = 0  -- Reset porque encontrou servidores
+                    
+                    -- Processa os servidores do cache local
+                    local curNow = os.time()
+                    local curVisited = getVisitedServers()
+                    for id, ts in pairs(curVisited) do
+                        if curNow - ts > VISITED_EXPIRY then curVisited[id] = nil end
+                    end
+                    saveVisitedServers(curVisited)
+                    
+                    local scored = {}
+                    for _, server in ipairs(localServers) do
+                        local serverId = tostring(server.id or "")
+                        if serverId == tostring(game.JobId) then continue end
+                        if visitedHas(curVisited, tostring(server.id or "")) then continue end
+                        local score = scoreServer(server)
+                        if score > 0 then
+                            table.insert(scored, { server = server, score = score })
+                        end
+                    end
+                    
+                    if #scored == 0 and #localServers > 0 then
+                        --print("[HOP] Todos cheios — usando fallback (servidores menos lotados)")
+                        for _, server in ipairs(localServers) do
+                            local serverId = tostring(server.id or "")
+                        if serverId == tostring(game.JobId) then continue end
+                            if visitedHas(curVisited, tostring(server.id or "")) then continue end
+                            local playing = server.playing or 0
+                            local score = math.max(1, 20 - playing) + math.random(0, 10)
+                            table.insert(scored, { server = server, score = score })
+                        end
+                    end
+                    
+                    table.sort(scored, function(a, b) return a.score > b.score end)
+                    
+                    candidateQueue = {}
+                    for _, entry in ipairs(scored) do
+                        if entry and entry.server and entry.server.id then
+                            table.insert(candidateQueue, entry.server)
+                        end
+                    end
+                    
+                    --print("[HOP] Candidatos na fila (cache local): " .. #candidateQueue)
+                    return #candidateQueue > 0
+                end
+                
+                -- ✅ Se cache local também falhou, limpa visited e reseta
+                --print("[HOP] ⚠️ Cache local vazio — limpando cache visited")
+-- Mantém o histórico para nunca revisitar automaticamente.
+                apiFails = 0
+            end
+            
             task.wait(backoff)
             return false
         end
@@ -1437,15 +1573,10 @@ local function startInfiniteHop(label)
         saveVisitedServers(curVisited)
 
         local scored = {}
-        local locks = fetchSharedLocks()  -- locks de TODAS as contas no Railway
-        local myUserId = (LocalPlayer and LocalPlayer.UserId or 0)
         for _, server in ipairs(allServers) do
             local serverId = tostring(server.id or "")
             if serverId == tostring(game.JobId) then continue end
             if visitedHas(curVisited, tostring(server.id or "")) then continue end
-            -- ✅ ANTI-COLISÃO: ignora servidores lockados por OUTRAS contas
-            local lk = locks[serverId]
-            if lk and lk.lockedBy ~= myUserId then continue end
             local score = scoreServer(server)
             if score > 0 then
                 table.insert(scored, { server = server, score = score })
@@ -1453,19 +1584,14 @@ local function startInfiniteHop(label)
         end
 
         -- Fallback: se todos estão cheios, tenta mesmo assim com os menos cheios
-        -- (ainda respeita os locks de outras contas para não esbarrar)
         if #scored == 0 and #allServers > 0 then
             --print("[HOP] Todos cheios — usando fallback (servidores menos lotados)")
             for _, server in ipairs(allServers) do
                 local serverId = tostring(server.id or "")
                         if serverId == tostring(game.JobId) then continue end
                 if visitedHas(curVisited, tostring(server.id or "")) then continue end
-                local lk = locks[serverId]
-                if lk and lk.lockedBy ~= myUserId then continue end
                 local playing = server.playing or 0
-                -- Fallback só aceita servidores 5-6 players mesmo (mínimo 5/8)
-                if playing < 5 or playing > 6 then continue end
-                local score = math.max(1, 30 - playing) + math.random(0, 10)
+                local score   = math.max(1, 20 - playing) + math.random(0, 10)
                 table.insert(scored, { server = server, score = score })
             end
         end
@@ -1534,9 +1660,6 @@ local function startInfiniteHop(label)
             debugLog("HOP: candidato bloqueado por já visitado/atual=" .. serverId)
             continue
         end
-        -- ✅ ANTI-COLISÃO: reserva o servidor no Railway ANTES de tudo
-        print(string.format("[LOCK] 📌 Tentando reservar serverId=%s...", tostring(serverId):sub(1, 8)))
-        lockMyServer(serverId)
         curVisited[serverId] = os.time()
         saveVisitedServers(curVisited)
         local playing = tonumber(server.playing) or 0
@@ -1551,15 +1674,13 @@ local function startInfiniteHop(label)
             TeleportService:TeleportToPlaceInstance(PLACE_ID, server.id, LocalPlayer)
         end)
 
-                if not teleOk then
+        if not teleOk then
             debugLog("HOP: teleport falhou=" .. tostring(err))
             --print("[HOP] ⚠️ Teleporte falhou: " .. tostring(err))
             curVisited[serverId] = nil
             saveVisitedServers(curVisited)
-        else
-            -- ✅ Notifica "bobnotifier10 entrou xxxxx (Job ID)" no Railway/Discord
-            notifyEntry(serverId, label)
         end
+
         task.wait(2)
     end
 end
