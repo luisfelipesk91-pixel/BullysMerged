@@ -826,28 +826,63 @@ local function sendToRailwayAPI(name, jobId, genText, value, key, ownerName, cur
     end)
 end
 
-local VISITED_EXPIRY = 600 -- 10 minutos (era 1h — muito longo com 18 contas)
+local VISITED_EXPIRY = 300 -- 5 minutos
 math.randomseed(os.clock() * 1000000 + (LocalPlayer and LocalPlayer.UserId or 0))
 
 -- Offset por conta: diversifica qual pool de servidores cada instância prioriza
-local ACCOUNT_POOL_OFFSET = (LocalPlayer and LocalPlayer.UserId or 0) % 4
+-- Com 40+ contas, espalhamos em 8 buckets (era 4)
+local ACCOUNT_POOL_OFFSET = (LocalPlayer and LocalPlayer.UserId or 0) % 8
+
+-- ════ VISITED SERVERS SYNC (compartilhado entre todas as contas via Railway) ════
+-- Cada conta consulta e atualiza o mesmo cache na Railway,
+-- evitando que múltiplas contas vão pro mesmo servidor.
+
+local _visitedCache = nil  -- cache local p/ não bater na API a cada leitura
 
 local function getVisitedServers()
-    local ok, content = pcall(function()
-        if isfile and isfile("visited_servers.json") then
-            return readfile("visited_servers.json")
+    -- Tenta buscar da Railway (cache compartilhado entre todas as contas)
+    local ok, resp = pcall(function()
+        return http_request({
+            Url = RAILWAY_API .. "/api/visited",
+            Method = "GET",
+            Headers = { ["X-Bob-Secret"] = RAILWAY_SECRET, ["X-Bob-Client"] = RAILWAY_CLIENT }
+        })
+    end)
+    if ok and resp and resp.StatusCode == 200 then
+        local parsed, data = pcall(function() return HttpService:JSONDecode(resp.Body) end)
+        if parsed and type(data) == "table" then
+            _visitedCache = data
+            return data
         end
+    end
+    -- Fallback: usa cache local se Railway falhar
+    if _visitedCache then return _visitedCache end
+    local fok, content = pcall(function()
+        if isfile and isfile("visited_servers.json") then return readfile("visited_servers.json") end
         return "{}"
     end)
-    local success, data = pcall(function() return HttpService:JSONDecode(ok and content or "{}") end)
-    return success and data or {}
+    local sok, fdata = pcall(function() return HttpService:JSONDecode(fok and content or "{}") end)
+    return sok and fdata or {}
 end
 
 local function saveVisitedServers(data)
+    _visitedCache = data
+    -- Salva local (fallback)
     pcall(function()
-        if writefile then
-            writefile("visited_servers.json", HttpService:JSONEncode(data))
-        end
+        if writefile then writefile("visited_servers.json", HttpService:JSONEncode(data)) end
+    end)
+    -- Sincroniza com Railway (compartilhado entre todas as contas)
+    pcall(function()
+        http_request({
+            Url = RAILWAY_API .. "/api/visited",
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json",
+                ["X-Bob-Secret"] = RAILWAY_SECRET,
+                ["X-Bob-Client"] = RAILWAY_CLIENT
+            },
+            Body = HttpService:JSONEncode(data)
+        })
     end)
 end
 
@@ -885,13 +920,14 @@ local function fetchAllServers(placeId)
     local allServers = {}
     local seenIds    = {}
 
-    local stagger = ACCOUNT_POOL_OFFSET * 0.5
+    -- Espalha as 40+ contas em até 40s de diferença antes de chamar a API
+    local stagger = (LocalPlayer.UserId % 40) * 1.0
     if stagger > 0 then task.wait(stagger) end
 
     local sortOrder = ACCOUNT_POOL_OFFSET % 2 == 0 and "Asc" or "Desc"
     local cursor    = nil
 
-    for page = 1, 2 do
+    for page = 1, 1 do  -- 1 página = 100 servidores, suficiente e reduz rate limit
         local url = "https://games.roblox.com/v1/games/" .. placeId
                     .. "/servers/Public?sortOrder=" .. sortOrder .. "&limit=100"
         if cursor and cursor ~= "" then
@@ -957,7 +993,7 @@ local function startInfiniteHop(label)
     local candidateQueue  = {}
     local lastFetchTime   = 0
     local apiFails        = 0
-    local MIN_FETCH_GAP   = 15  -- segundos mínimos entre fetches
+    local MIN_FETCH_GAP   = 60  -- segundos mínimos entre fetches (era 15 — insuficiente p/ 40 contas)
 
     local function refillQueue()
         -- Enforça cooldown entre chamadas à API
@@ -978,7 +1014,7 @@ local function startInfiniteHop(label)
 
         if #allServers == 0 then
             apiFails = apiFails + 1
-            local backoff = math.min(apiFails * 8, 40)
+            local backoff = math.min(apiFails * 20, 120)  -- backoff mais agressivo: até 2 min
             print("[HOP] API falhou " .. apiFails .. "x — backoff " .. backoff .. "s")
             text.Text = "⏳ API indisponível, aguardando " .. backoff .. "s..."
             task.wait(backoff)
@@ -1024,8 +1060,21 @@ local function startInfiniteHop(label)
 
         table.sort(scored, function(a, b) return a.score > b.score end)
 
+        -- Pega o top 30 e embaralha entre eles: contas diferentes escolhem servidores diferentes
+        -- mesmo tendo a mesma lista base
+        local topN = math.min(30, #scored)
+        local topPool = {}
+        for i = 1, topN do table.insert(topPool, scored[i]) end
+        -- Fisher-Yates shuffle no top pool
+        for i = #topPool, 2, -1 do
+            local j = math.random(1, i)
+            topPool[i], topPool[j] = topPool[j], topPool[i]
+        end
+        -- Adiciona o restante no final (já ordenado)
+        for i = topN + 1, #scored do table.insert(topPool, scored[i]) end
+
         candidateQueue = {}
-        for _, entry in ipairs(scored) do
+        for _, entry in ipairs(topPool) do
             table.insert(candidateQueue, entry.server)
         end
 
