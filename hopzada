@@ -1143,14 +1143,14 @@ local function scoreServer(server)
     local playing    = server.playing    or 0
     local maxPlayers = server.maxPlayers
     if not maxPlayers or maxPlayers <= 0 then maxPlayers = 12 end
-    -- Só entra em servidores com no máximo 6 jogadores
+    -- Só entra em servidores cheios (mínimo 5/8, máximo 6/8)
+    if playing < 5 then return -1 end
     if playing > 6 then return -1 end
     local score
-    if    playing <= 2 then score = 100
-    elseif playing <= 4 then score = 80
-    else                     score = 50  -- 5-6 players
+    if    playing == 5 then score = 100
+    else                     score = 90  -- 6 players
     end
-    return score + math.random(0, 35)
+    return score + math.random(0, 25)
 end
 
 -- ════════════════════════════════════════════════════════════
@@ -1463,7 +1463,9 @@ local function startInfiniteHop(label)
                 local lk = locks[serverId]
                 if lk and lk.lockedBy ~= myUserId then continue end
                 local playing = server.playing or 0
-                local score   = math.max(1, 20 - playing) + math.random(0, 10)
+                -- Fallback só aceita servidores 5-6 players mesmo (mínimo 5/8)
+                if playing < 5 or playing > 6 then continue end
+                local score = math.max(1, 30 - playing) + math.random(0, 10)
                 table.insert(scored, { server = server, score = score })
             end
         end
