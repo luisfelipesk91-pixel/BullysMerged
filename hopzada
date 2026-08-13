@@ -5,11 +5,16 @@ local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local RS = game:GetService("ReplicatedStorage")
 
+-- ✅ FIX: Garante que CoreGui seja uma Instance válida
+local CoreGui = gethui and gethui() or game:GetService("CoreGui")
+if not CoreGui or typeof(CoreGui) ~= "Instance" then
+    CoreGui = game:GetService("CoreGui")
+end
+
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
--- ✅ FIX TIMING: Aguarda UI carregar (TextLabels das bases)
-task.wait(2.5)
+task.wait(0.3)
 
 -- CONFIGURAÇÕES DE WEBHOOKS
 local WEBHOOK_URL   = "https://discord.com/api/webhooks/1524877771954978837/iF0UzBPKPI7-7nvAD84evgoLEg_wcVKaA0ruf_lqA0atbSRks0J9h4ZfivNfYmVG2O9r?with_components=true"
@@ -25,42 +30,16 @@ local RAILWAY_CLIENT = "Bobnotify"
 -- [LÓGICA DE SCAN E HOP CONTINUA ABAIXO...]
 local TARGET_NAMES   = {""}
 local ULTRA_BRAINROTS = {"Dragon Cannelloni", "Pineaplino", "Yess My Examen", "Caramello Filtrello", "Tob Tobi Tobi", "Bearito Cabinito", "Venuspino", "Festive 67", "Gorillo Subwoofero", "Cerberus", "Centrucci Nuclucci", "Rhino Helicopterino", "La Casa Boo", "Ganganzelli Trulala", "Strawberry Elephant", "Headless Horseman", "Skibidi Toilet", "Meowl", "Griffin", "Dragon Gingerini", "Hydra Dragon Cannelloni", "Ice Dragon", "Love Love Bear", "Digi Narwhal", "La Supreme Combinasion", "Hydra Bunny", "Bunny and Eggy", "Rosey and Teddy", "Cooki and Milki", "Arcadragon", "Ketupat Bros", "Reinito Sleghito", "Fortunu and Cashuru", "Los Amigos", "Pancake and Syrup", "Foxini Larternini", "Kalika Bros", "Los Sekolahs", "Signore Carapace", "Fragrama and Chocrama", "Cash or Card", "La Casa Boo", "La Food Combinasion", "Elefanto Frigo", "Spooky and Pumpky", "Boppin Bunny", "Ginger Gerat", "Los Chillis", "Sammyni Fattini", "Los Spaghettis", "Festive 67", "Quackini Snackini", "Antonio", "Hopilikalika Hopilikalako", "Fishino Clownino", "Jolly Jolly Sahur", "Tirilikaliko Tirilikalako", "Lovin Rose", "Fragola La La La", "Los Tacoritas", "Dragon Aquanini", "Tirilikalika Tirilikalako", "Jelly Moby", "Duggy Bros", "Sammyni Cakini", "Los Hackers", "Rubrikiko", "Rico Dinero", "Money Money Bros", "Dug Dug Dug", "Globa Steppa", "Caramelo Filtrello", "Gorilo Subwoofero", "Kraken", "Moby Bros", "Los Secret Combinasionas", "Pizza And Ranch", "Los Admins", "Rubiko And Kubiko", "Examen Bros", "Grabatron", "Capitano Americano", "Tenini Ballini"}
-local BLACK_NAMES    = {"Fishboard", "Chicleteira Bicicleteira", "67", "25", "Octoball", "Aquarino", "Lucky Block", "Los Taco Blocks", "To to to Sahur", "Graipuss Medussi", "Bunny Bunny Bunny Sahur", "Serafinna Medusella", "Chicleteirina Bicicleteirina", "Santa Hotspot", "Cupid Hotspot", "Los Quesadillas", "Naughty Naughty", "Flancito", "Capitano Gullini", "La Vacca Lepre Lepreino", "Quesadilla Crocodilla", "Easter Easter Easter Sahur", "Bombardiro Vaccariro", "Burrito Bandito", "Los Nooo My Hotspotsitos", "Los Sigmas", "Toro Españolo", "Ombrello Topolino", "Rocketini Frostini", "Sushi Inu", "Gelato Lumacho", "Pot Hotspot"}
+local BLACK_NAMES    = {"Fishboard", "Chicleteira Bicicleteira", "Octoball", "Aquarino", "Lucky Block", "Los Taco Blocks", "To to to Sahur", "Graipuss Medussi", "Bunny Bunny Bunny Sahur", "Serafinna Medusella", "Chicleteirina Bicicleteirina", "Santa Hotspot", "Cupid Hotspot", "Los Quesadillas", "Naughty Naughty", "Flancito", "Capitano Gullini", "La Vacca Lepre Lepreino", "Quesadilla Crocodilla", "Easter Easter Easter Sahur", "Bombardiro Vaccariro", "Burrito Bandito", "Los Nooo My Hotspotsitos", "Los Sigmas", "Toro Españolo", "Ombrello Topolino", "Rocketini Frostini", "Sushi Inu", "Gelato Lumacho", "Pot Hotspot"}
 local MIN_VALUE        = 20000000
 local MIN_VALUE_CARPET = 20000000
 local NOTIFIER_NAME = "bob"
 local CURRENT_JOB   = tostring(game.JobId)
 local PLACE_ID      = game.PlaceId
 local LocalPlayer = Players.LocalPlayer
-local DEBUG_MODE = false
-local function debugLog(message)
-    if DEBUG_MODE then
-        print("[BOB DEBUG] " .. tostring(message))
-    end
-end
-debugLog("BOOT: script carregado; JobId=" .. tostring(game.JobId) .. " PlaceId=" .. tostring(game.PlaceId))
---print("Players: " .. tostring(#Players:GetPlayers()))
+print("Players: " .. tostring(#Players:GetPlayers()))
 
 local http_request = http_request or (syn and syn.request) or (http and http.request) or request
-
--- ═══ NOTIFICAÇÃO DE ENTRADA: avisa o Railway/Discord quando a conta entra no servidor ═══
-local function notifyEntry(serverId, accountName)
-    pcall(function()
-        return http_request({
-            Url     = RAILWAY_API .. "/api/entered",
-            Method  = "POST",
-            Headers = {
-                ["Content-Type"]  = "application/json",
-                ["X-Bob-Client"]  = RAILWAY_CLIENT,
-                ["X-Bob-Secret"]  = RAILWAY_SECRET,
-            },
-            Body = HttpService:JSONEncode({
-                account = tostring(accountName or LocalPlayer.Name or "???"),
-                jobId   = tostring(serverId),
-            })
-        })
-    end)
-end
 
 local MUTATION_EMOJIS = {
     ["Default"]     = "<:MutDefault:1500616721373855780>",
@@ -412,105 +391,266 @@ local function isPlotOwnerInDuel(plot, duelPlayers)
     return false
 end
 
--- ✅ CACHE DE MULTIPLICADORES (calculado 1x, usado milhares de vezes)
-local MUTATION_MODS = {
-    ["Gold"] = 1.25, ["Diamond"] = 1.5, ["Bloodrot"] = 2, ["Blood Rot"] = 2,
-    ["Candy"] = 4, ["Lava"] = 6, ["Galaxy"] = 7, ["YinYang"] = 7.5, ["Yin Yang"] = 7.5,
-    ["Radioactive"] = 8.5, ["Cursed"] = 9, ["Rainbow"] = 10, ["Divine"] = 10,
-    ["Cyber"] = 11, ["Phantom"] = 12, ["Crystal"] = 13
-}
-
-local TRAIT_MODS = {
-    -- OG
-    ["Strawberry"] = 8, ["Meowl"] = 7, ["John Pork"] = 6.5, ["Skibidi"] = 6,
-    -- Seasonal
-    ["Rainbow Balloon"] = 6.5, ["Pink Egg"] = 6.5, ["1 Year"] = 5.5, ["Pink Balloon"] = 5.5,
-    ["Granny"] = 5.5, ["Reindeer Pet"] = 5, ["26"] = 5, ["Halo"] = 5, ["Lucky"] = 5,
-    ["Red Balloon"] = 5, ["Blue Egg"] = 5, ["Sun"] = 5, ["Ball"] = 5, ["Bunny Ears"] = 4.5,
-    ["Chocolate"] = 4.5, ["Jackolantern Pet"] = 4.5, ["Jack O'Lantern"] = 4.5,
-    ["Blue Balloon"] = 4, ["Green Egg"] = 4, ["Santa Hat"] = 4, ["RIP Gravestone"] = 3.5,
-    ["RIP Tombstone"] = 3.5, ["Green Balloon"] = 3.5, ["Orange Balloon"] = 3,
-    ["Orange Egg"] = 3, ["Skeleton"] = 3, ["10B"] = 3, ["Witch Hat"] = 3,
-    -- Rituals
-    ["Paint"] = 5, [":3"] = 4.5, ["Tie"] = 3.75, ["Spider"] = 3.5, ["Matteo Hat"] = 3.5,
-    ["Galactic"] = 3, ["Explosive"] = 3, ["Shark Fin"] = 3,
-    -- Country
-    ["Brazil"] = 5, ["Indonesia"] = 4, ["Sombrero"] = 4, ["Bull"] = 2,
-    -- FIFA 2026
-    ["Algeria"] = 4.5, ["Argentina"] = 4.5, ["Australia"] = 4.5, ["Austria"] = 4.5,
-    ["Belgium"] = 4.5, ["Bosnia and Herzegovina"] = 4.5, ["Canada"] = 4.5, ["Cape Verde"] = 4.5,
-    ["Croatia"] = 4.5, ["Curacao"] = 4.5, ["Czechia"] = 4.5, ["DR Congo"] = 4.5,
-    ["Ecuador"] = 4.5, ["Egypt"] = 4.5, ["England"] = 4.5, ["France"] = 4.5,
-    ["Germany"] = 4.5, ["Ghana"] = 4.5, ["Haiti"] = 4.5, ["Iran"] = 4.5,
-    ["Iraq"] = 4.5, ["Ivory Coast"] = 4.5, ["Japan"] = 4.5, ["Jordan"] = 4.5,
-    ["Mexico"] = 4.5, ["Morocco"] = 4.5, ["Netherlands"] = 4.5, ["New Zealand"] = 4.5,
-    ["Norway"] = 4.5, ["Panama"] = 4.5, ["Paraguay"] = 4.5, ["Portugal"] = 4.5,
-    ["Qatar"] = 4.5, ["Saudi Arabia"] = 4.5, ["Scotland"] = 4.5, ["Senegal"] = 4.5,
-    ["South Africa"] = 4.5, ["South Korea"] = 4.5, ["Spain"] = 4.5, ["Sweden"] = 4.5,
-    ["Switzerland"] = 4.5, ["Tunisia"] = 4.5, ["Turkey"] = 4.5, ["United States"] = 4.5,
-    ["Uruguay"] = 4.5, ["Uzbekistan"] = 4.5,
-    -- Admin
-    ["Fire"] = 5, ["Rose"] = 5, ["Fireworks"] = 5, ["Nyan"] = 5, ["Lightning"] = 5,
-    ["Burger"] = 4.5, ["Aura Shades"] = 4.5, ["Disco"] = 4, ["Glitched"] = 4,
-    ["Zombie"] = 4, ["Claws"] = 4, ["Crab Claw"] = 4, ["Bubblegum"] = 3, ["UFO"] = 2, ["Taco"] = 2,
-    -- Natural
-    ["Cometstruck"] = 2.5, ["Comet-struck"] = 2.5, ["Snowy"] = 2, ["Wet"] = 1.5,
-    -- Special (multiplicador aplicado depois)
-    ["Sleepy"] = 0
-}
-
--- ✅ FUNÇÃO OTIMIZADA: Calcular valor de um brainrot
-local function calculateGenValue(name, mutation, traitsTable)
-    if not AnimalsData or not AnimalsData[name] then return nil end
-    
-    -- Base generation (sem mutation/traits)
-    local baseGen = nil
-    local ok1, result1 = pcall(function() return _G._xenGen(name, nil, nil) end)
-    if ok1 and type(result1) == "number" and result1 > 0 then 
-        baseGen = result1
-    end
-    
-    if not baseGen then
-        baseGen = AnimalsData[name].Generation
-        if not baseGen or type(baseGen) ~= "number" or baseGen <= 0 then
-            return nil
-        end
-    end
-    
-    -- Mutation multiplier (✅ usa cache)
-    local mutationMod = mutation and MUTATION_MODS[mutation] or 1
-    
-    -- Traits sum (✅ usa cache)
-    local traitsSum = 0
-    local hasSleepy = false
-    
-    if traitsTable and #traitsTable > 0 then
-        for _, trait in ipairs(traitsTable) do
-            if trait == "Sleepy" then
-                hasSleepy = true
-            else
-                traitsSum = traitsSum + (TRAIT_MODS[trait] or 0)
-            end
-        end
-    end
-    
-    -- Calcular: Base × (Mutation + TraitsSum)
-    local genValue = baseGen * (mutationMod + traitsSum)
-    
-    -- Aplicar Sleepy por último (× 0.5)
-    if hasSleepy then
-        genValue = genValue * 0.5
-    end
-    
-    return genValue
-end
-
--- ✅ SCAN DE PLOTS DESABILITADO (Synchronizer não funciona neste jogo)
--- O jogo não armazena dados de brainrots via Synchronizer
--- Usamos apenas scanCarpet() para detectar brainrots na esteira
 local function scanPlots(duelPlayers, seen, currentJobId)
-    -- O scan de plots foi desabilitado; a detecção é feita por scanCarpet().
-    return {}
+    local results = {}
+    local plots = Workspace:FindFirstChild("Plots")
+    if not plots then return results end
+    
+    for _, plot in ipairs(plots:GetChildren()) do
+        local pot = _G.XenSyncGet(plot.Name)
+        if not pot then continue end
+        
+        local ok2, list = pcall(function() return pot:Get("AnimalList") end)
+        if not ok2 or type(list) ~= "table" then continue end
+        
+        local syncOwner = nil
+        local ownerOk, ownerVal = pcall(function() return pot:Get("Owner") end)
+        if ownerOk and ownerVal ~= nil then
+            syncOwner = type(ownerVal) == "string" and ownerVal or tostring(ownerVal)
+        end
+        local plotDuel = false
+        if syncOwner and duelPlayers[syncOwner] then plotDuel = true
+        else plotDuel = isPlotOwnerInDuel(plot, duelPlayers) end
+        local ownerName = syncOwner or resolveOwnerName(ownerVal) or "?"
+        
+        local plotHasQualifying = false
+        local plotItems = {}
+        
+        local animalCount = 0
+        for petIdOrData, animalData in pairs(list) do
+            animalCount = animalCount + 1
+            
+            -- Filtrar valores inválidos ANTES de processar
+            if type(animalData) == "string" and (animalData == "Empty" or animalData == "" or animalData == "nil") then
+                continue
+            end
+            
+            -- FIX UUID: Se animalData é string (UUID), buscar o pet
+            if type(animalData) == "string" then
+                local ok_pet, petData = pcall(function() return pot:Get(animalData) end)
+                if ok_pet and type(petData) == "table" then
+                    animalData = petData
+                else
+                    continue
+                end
+            end
+            
+            if type(animalData) ~= "table" then continue end
+            if isFusing(animalData) then continue end
+            
+            local name = animalData.Index
+            if not name then continue end
+            if not AnimalsData or not AnimalsData[name] then continue end
+            
+            local inDuel = isInDuel(animalData) or plotDuel
+            local data = animalData.Data or animalData
+            local mutation = data.Mutation
+            if type(mutation) ~= "string" or mutation == "" then mutation = nil end
+            
+            local traitsTable = nil
+            local traitsList = {}
+            if type(data.Traits) == "table" then
+                traitsTable = {}
+                if #data.Traits > 0 then
+                    for _, trait in ipairs(data.Traits) do
+                        if type(trait) == "string" then
+                            table.insert(traitsTable, trait)
+                            table.insert(traitsList, trait)
+                        end
+                    end
+                else
+                    for traitName, enabled in pairs(data.Traits) do
+                        if enabled then
+                            table.insert(traitsTable, traitName)
+                            table.insert(traitsList, traitName)
+                        end
+                    end
+                end
+                if #traitsTable == 0 then traitsTable = nil end
+            end
+            
+            -- Calcular valor usando fórmula: (Base × Mutation) + Trait1 + Trait2 + ...
+            local genValue = nil
+            local baseGen = nil
+            
+            -- Método 1: _xenGen sem mutation/traits ($/s base)
+            local ok1, result1 = pcall(function() return _G._xenGen(name, nil, nil) end)
+            if ok1 and type(result1) == "number" and result1 > 0 then 
+                baseGen = result1
+            end
+            
+            -- Fallback: Usar AnimalsData base
+            if not baseGen then
+                baseGen = AnimalsData[name].Generation
+                if not baseGen or type(baseGen) ~= "number" or baseGen <= 0 then
+                    continue
+                end
+            end
+            
+            -- FÓRMULA CORRETA: Base × (Mutation + (Trait1 + Trait2 + ...))
+            local mutationMod = 1
+            if mutation then
+                if mutation == "Gold" then mutationMod = 1.25
+                elseif mutation == "Diamond" then mutationMod = 1.5
+                elseif mutation == "Bloodrot" or mutation == "Blood Rot" then mutationMod = 2
+                elseif mutation == "Candy" then mutationMod = 4
+                elseif mutation == "Lava" then mutationMod = 6
+                elseif mutation == "Galaxy" then mutationMod = 7
+                elseif mutation == "YinYang" or mutation == "Yin Yang" then mutationMod = 7.5
+                elseif mutation == "Radioactive" then mutationMod = 8.5
+                elseif mutation == "Cursed" then mutationMod = 9
+                elseif mutation == "Rainbow" then mutationMod = 10
+                elseif mutation == "Divine" then mutationMod = 10
+                elseif mutation == "Cyber" then mutationMod = 11
+                elseif mutation == "Phantom" then mutationMod = 12
+                elseif mutation == "Crystal" then mutationMod = 13
+                end
+            end
+            
+            -- SOMAR todos os traits (exceto Sleepy)
+            local traitsSum = 0
+            if traitsTable and #traitsTable > 0 then
+                for _, trait in ipairs(traitsTable) do
+                    local traitMod = 0
+                    
+                    -- TRAITS OG
+                    if trait == "Strawberry" then traitMod = 8
+                    elseif trait == "Meowl" then traitMod = 7
+                    elseif trait == "John Pork" then traitMod = 6.5
+                    elseif trait == "Skibidi" then traitMod = 6
+                    
+                    -- TRAITS SEASONAL
+                    elseif trait == "Rainbow Balloon" then traitMod = 6.5
+                    elseif trait == "Pink Egg" then traitMod = 6.5
+                    elseif trait == "1 Year" then traitMod = 5.5
+                    elseif trait == "Pink Balloon" then traitMod = 5.5
+                    elseif trait == "Granny" then traitMod = 5.5
+                    elseif trait == "Reindeer Pet" then traitMod = 5
+                    elseif trait == "26" then traitMod = 5
+                    elseif trait == "Halo" then traitMod = 5
+                    elseif trait == "Lucky" then traitMod = 5
+                    elseif trait == "Red Balloon" then traitMod = 5
+                    elseif trait == "Blue Egg" then traitMod = 5
+                    elseif trait == "Sun" then traitMod = 5
+                    elseif trait == "Ball" then traitMod = 5
+                    elseif trait == "Bunny Ears" then traitMod = 4.5
+                    elseif trait == "Chocolate" then traitMod = 4.5
+                    elseif trait == "Jackolantern Pet" or trait == "Jack O'Lantern" then traitMod = 4.5
+                    elseif trait == "Blue Balloon" then traitMod = 4
+                    elseif trait == "Green Egg" then traitMod = 4
+                    elseif trait == "Santa Hat" then traitMod = 4
+                    elseif trait == "RIP Gravestone" or trait == "RIP Tombstone" then traitMod = 3.5
+                    elseif trait == "Green Balloon" then traitMod = 3.5
+                    elseif trait == "Orange Balloon" then traitMod = 3
+                    elseif trait == "Orange Egg" then traitMod = 3
+                    elseif trait == "Skeleton" then traitMod = 3
+                    elseif trait == "10B" then traitMod = 3
+                    elseif trait == "Witch Hat" then traitMod = 3
+                    
+                    -- TRAITS RITUALS
+                    elseif trait == "Paint" then traitMod = 5
+                    elseif trait == ":3" then traitMod = 4.5
+                    elseif trait == "Tie" then traitMod = 3.75
+                    elseif trait == "Spider" then traitMod = 3.5
+                    elseif trait == "Matteo Hat" then traitMod = 3.5
+                    elseif trait == "Galactic" then traitMod = 3
+                    elseif trait == "Explosive" then traitMod = 3
+                    elseif trait == "Shark Fin" then traitMod = 3
+                    
+                    -- TRAITS COUNTRY
+                    elseif trait == "Brazil" then traitMod = 5
+                    elseif trait == "Indonesia" then traitMod = 4
+                    elseif trait == "Sombrero" then traitMod = 4
+                    elseif trait == "Bull" then traitMod = 2
+                    
+                    -- TRAITS FIFA 2026 (todas 4.5x)
+                    elseif trait == "Algeria" or trait == "Argentina" or trait == "Australia" or trait == "Austria"
+                        or trait == "Belgium" or trait == "Bosnia and Herzegovina" or trait == "Canada" or trait == "Cape Verde"
+                        or trait == "Croatia" or trait == "Curacao" or trait == "Czechia" or trait == "DR Congo"
+                        or trait == "Ecuador" or trait == "Egypt" or trait == "England" or trait == "France"
+                        or trait == "Germany" or trait == "Ghana" or trait == "Haiti" or trait == "Iran"
+                        or trait == "Iraq" or trait == "Ivory Coast" or trait == "Japan" or trait == "Jordan"
+                        or trait == "Mexico" or trait == "Morocco" or trait == "Netherlands" or trait == "New Zealand"
+                        or trait == "Norway" or trait == "Panama" or trait == "Paraguay" or trait == "Portugal"
+                        or trait == "Qatar" or trait == "Saudi Arabia" or trait == "Scotland" or trait == "Senegal"
+                        or trait == "South Africa" or trait == "South Korea" or trait == "Spain" or trait == "Sweden"
+                        or trait == "Switzerland" or trait == "Tunisia" or trait == "Turkey" or trait == "United States"
+                        or trait == "Uruguay" or trait == "Uzbekistan" then traitMod = 4.5
+                    
+                    -- TRAITS ADMIN ABUSE
+                    elseif trait == "Fire" then traitMod = 5
+                    elseif trait == "Rose" then traitMod = 5
+                    elseif trait == "Fireworks" then traitMod = 5
+                    elseif trait == "Nyan" then traitMod = 5
+                    elseif trait == "Lightning" then traitMod = 5
+                    elseif trait == "Burger" then traitMod = 4.5
+                    elseif trait == "Aura Shades" then traitMod = 4.5
+                    elseif trait == "Disco" then traitMod = 4
+                    elseif trait == "Glitched" then traitMod = 4
+                    elseif trait == "Zombie" then traitMod = 4
+                    elseif trait == "Claws" or trait == "Crab Claw" then traitMod = 4
+                    elseif trait == "Bubblegum" then traitMod = 3
+                    elseif trait == "UFO" then traitMod = 2
+                    elseif trait == "Taco" then traitMod = 2
+                    
+                    -- TRAITS NATURAL EVENTS
+                    elseif trait == "Cometstruck" or trait == "Comet-struck" then traitMod = 2.5
+                    elseif trait == "Snowy" then traitMod = 2
+                    elseif trait == "Wet" then traitMod = 1.5
+                    
+                    -- Sleepy (não soma aqui, aplicado depois)
+                    elseif trait == "Sleepy" then traitMod = 0
+                    end
+                    
+                    traitsSum = traitsSum + traitMod
+                end
+            end
+            
+            -- CALCULAR: Base × (Mutation + TraitsSum)
+            genValue = baseGen * (mutationMod + traitsSum)
+            
+            -- Aplicar Sleepy por último (× 0.5)
+            if traitsTable then
+                for _, trait in ipairs(traitsTable) do
+                    if trait == "Sleepy" then
+                        genValue = genValue * 0.5
+                        break
+                    end
+                end
+            end
+            
+            if not genValue or genValue <= 0 then continue end
+            
+            local qualifies = shouldScan(name, genValue)
+            
+            if qualifies then plotHasQualifying = true end
+            local displayName = name
+            local info = AnimalsData[name]
+            if info and info.DisplayName then displayName = info.DisplayName end
+            table.insert(plotItems, {
+                name = displayName, index = name, genValue = genValue,
+                mutation = mutation, traitsList = traitsList,
+                traitCount = traitsTable and #traitsTable or 0,
+                inDuel = inDuel, qualifies = qualifies, ownerName = ownerName,
+            })
+        end
+        
+        if not plotHasQualifying then continue end
+        
+        for _, item in ipairs(plotItems) do
+            if not item.qualifies then continue end
+            local genText = "$" .. formatValue(item.genValue) .. "/s"
+            table.insert(results, {
+                tier = (item.genValue >= 1e9 or isUltra(item.name)) and "ULTRA" or (item.genValue >= 100e6) and "HIGH" or "MID",
+                name = item.name, gen = genText, value = item.genValue,
+                mutation = item.mutation, traits = #item.traitsList > 0 and item.traitsList or nil,
+                inDuel = item.inDuel, ownerName = item.ownerName,
+            })
+            print(string.format("FOUND: %s | Mutation: %s | Traits: %d | Gen: %s", item.name, item.mutation or "None", item.traitCount, genText))
+        end
+    end
+    
+    return results
 end
 
 local function parseObjectText(objectText)
@@ -523,402 +663,43 @@ local function parseObjectText(objectText)
     return objectText:match("^%s*(.-)%s*$"), 0
 end
 
--- Leitura leve: não chama GetDescendants dentro de cada prompt.
-local function canonicalDataKey(value, dataMap)
-    if value == nil then return nil end
-    local normalized = tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
-    for key in pairs(dataMap) do
-        if tostring(key):lower() == normalized:lower() then return key end
-    end
-    return normalized ~= "" and normalized or nil
-end
-
-local function findPromptData(prompt)
-    local promptText = tostring(prompt.ObjectText or "")
-    local texts = { promptText }
-    local traitTexts = {}
-    local mutationTexts = {}
-    local promptTextLower = promptText:lower()
-    if promptTextLower:find("trait", 1, true) then table.insert(traitTexts, promptText) end
-    if promptTextLower:find("mutation", 1, true) then table.insert(mutationTexts, promptText) end
-    local nodes = { prompt }
-    local ancestor = prompt.Parent
-    for _ = 1, 6 do
-        if not ancestor or ancestor == Workspace then break end
-        table.insert(nodes, ancestor)
-        ancestor = ancestor.Parent
-    end
-    for _, node in ipairs(nodes) do
-        table.insert(texts, tostring(node.Name or ""))
-        for key, attr in pairs(node:GetAttributes()) do
-            local keyLower = tostring(key):lower()
-            local valueText = tostring(attr or "")
-            if keyLower:find("mutation", 1, true) then
-                table.insert(mutationTexts, valueText)
-            elseif keyLower:find("trait", 1, true) then
-                table.insert(traitTexts, valueText)
-            end
-        end
-        for _, child in ipairs(node:GetChildren()) do
-            table.insert(texts, tostring(child.Name or ""))
-            for key, attr in pairs(child:GetAttributes()) do
-                local keyLower = tostring(key):lower()
-                local attrText = tostring(attr or "")
-                if keyLower:find("mutation", 1, true) then
-                    table.insert(mutationTexts, attrText)
-                elseif keyLower:find("trait", 1, true) then
-                    table.insert(traitTexts, attrText)
-                end
-            end
-            local childNameLower = tostring(child.Name or ""):lower()
-            local childValue = ""
-            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
-                childValue = tostring(child.Text or "")
-                table.insert(texts, childValue)
-            elseif child:IsA("StringValue") or child:IsA("IntValue") or child:IsA("NumberValue") then
-                childValue = tostring(child.Value or "")
-                table.insert(texts, childValue)
-            end
-            -- Só trata o conteúdo como trait/mutation quando o objeto indica explicitamente isso.
-            if childNameLower:find("trait", 1, true) then
-                table.insert(traitTexts, childValue)
-            elseif childNameLower:find("mutation", 1, true) then
-                table.insert(mutationTexts, childValue)
-            end
-        end
-    end
-
-    local name, value, mutation, traits = nil, 0, nil, {}
-    for _, text in ipairs(texts) do
-        local parsedName, parsedValue = parseObjectText(text)
-        if parsedValue and parsedValue > value then value = parsedValue end
-        -- Traits e mutation são processados abaixo somente das fontes explicitamente marcadas.
-
-        if AnimalsData then
-            local lowText = text:lower()
-            for candidate in pairs(AnimalsData) do
-                if lowText:find(tostring(candidate):lower(), 1, true) then name = candidate break end
-            end
-        end
-        -- Não usa textos genéricos de filhos (números, traits ou mutações) como nome.
-        -- O nome válido deve vir de AnimalsData; isso evita casos como "67".
-    end
-
-    for _, sourceText in ipairs(mutationTexts) do
-        local lowText = tostring(sourceText):lower()
-        for candidate in pairs(MUTATION_MODS) do
-            if candidate ~= "Default" and lowText:find(tostring(candidate):lower(), 1, true) then
-                mutation = canonicalDataKey(candidate, MUTATION_MODS)
-                break
-            end
-        end
-        if mutation then break end
-    end
-
-    for _, sourceText in ipairs(traitTexts) do
-        local lowText = tostring(sourceText):lower()
-        for candidate in pairs(TRAIT_MODS) do
-            if lowText:find(tostring(candidate):lower(), 1, true) then
-                local canonical = canonicalDataKey(candidate, TRAIT_MODS)
-                local already = false
-                for _, existing in ipairs(traits) do
-                    if existing == canonical then already = true break end
-                end
-                if not already then table.insert(traits, canonical) end
-            end
-        end
-    end
-
-    return name, value, mutation, traits
-end
-
 local function scanCarpet(seen, currentJobId)
     local results = {}
-    local baseResults = {}
-    local carpetCount = 0
-    local promptTotal = 0
-    local disabledCount = 0
-    local actionMismatch = 0
-    local noNameCount = 0
-    local blacklistedCount = 0
-    local lowValueCount = 0
-    local uniqueResults = {}
-    
-    --print("[SCAN DEBUG] ===== INICIO SCAN CARPET =====")
-    --print("[SCAN DEBUG] AnimalsData=" .. tostring(type(AnimalsData)) .. " entries=" .. tostring(AnimalsData and #AnimalsData or 0))
-    
-    -- Uma única varredura geral do Workspace.
-    local descendants = Workspace:GetDescendants()
-    
-    for _, obj in ipairs(descendants) do
-        if not obj:IsA("ProximityPrompt") then continue end
-        promptTotal = promptTotal + 1
-        local action = tostring(obj.ActionText or "")
-        local objectText = tostring(obj.ObjectText or "")
-        local parentName = obj.Parent and obj.Parent:GetFullName() or "nil"
-        --print(string.format("[SCAN DEBUG] Prompt #%d enabled=%s action=%q object=%q parent=%s", promptTotal, tostring(obj.Enabled), action, objectText, parentName))
-        if not obj.Enabled then
-            disabledCount = disabledCount + 1
-            --print("[SCAN DEBUG] DESCARTADO: prompt desabilitado")
-            continue
-        end
-        local actionLower = action:lower()
-        -- Brainrots já colocados em bases usam "Steal", não "Purchase".
-        if actionLower ~= "purchase" and actionLower ~= "steal" then
-            actionMismatch = actionMismatch + 1
-            --print("[SCAN DEBUG] DESCARTADO: ActionText não é Purchase nem Steal")
-            continue
-        end
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if not obj:IsA("ProximityPrompt") or not obj.Enabled then continue end
+        if (obj.ActionText or "") ~= "Purchase" then continue end
+        local displayName, genValue = parseObjectText(obj.ObjectText)
+        if not displayName or displayName == "" then continue end
         
-        carpetCount = carpetCount + 1
-        local displayName, genValue, mutation, traits = findPromptData(obj)
-        --print(string.format("[SCAN DEBUG] Dados extraidos: nome=%q valorTexto=%s", tostring(displayName), tostring(genValue)))
-        if not displayName or displayName == "" then
-            noNameCount = noNameCount + 1
-            --print("[SCAN DEBUG] DESCARTADO: nenhum nome encontrado no prompt/pai/filhos imediatos")
-            continue
-        end
-        
-        if isBlacklisted(displayName) then
-            blacklistedCount = blacklistedCount + 1
-            --print("[SCAN DEBUG] DESCARTADO: blacklist -> " .. tostring(displayName))
-            continue
-        end
-        
-        local dataName = displayName
-        if not (AnimalsData and AnimalsData[dataName]) and AnimalsData then
-            local lowName = displayName:lower()
-            for candidate in pairs(AnimalsData) do
-                if tostring(candidate):lower() == lowName then dataName = candidate break end
+        -- Usar mesma lógica dos plots para pegar valor base correto
+        if AnimalsData and AnimalsData[displayName] then
+            local baseGen = nil
+            
+            -- Método 1: GetGenerationNoTraits (retorna $/s base SEM mutation)
+            local ok1, result1 = pcall(function() return _G._xenGen(displayName, nil, nil) end)
+            if ok1 and type(result1) == "number" and result1 > 0 then 
+                baseGen = result1
+            end
+            
+            -- Fallback: Usar AnimalsData base
+            if not baseGen then
+                baseGen = AnimalsData[displayName].Generation
+            end
+            
+            if baseGen and type(baseGen) == "number" and baseGen > 0 then
+                genValue = baseGen
             end
         end
-        --print(string.format("[SCAN DEBUG] AnimalsData lookup: display=%q dataName=%q existe=%s", tostring(displayName), tostring(dataName), tostring(AnimalsData and AnimalsData[dataName] ~= nil)))
-        if AnimalsData and AnimalsData[dataName] then
-            local calculatedValue = calculateGenValue(dataName, mutation, traits)
-            --print("[SCAN DEBUG] Generation calculada: " .. tostring(calculatedValue))
-            if calculatedValue and calculatedValue > 0 then genValue = calculatedValue end
-        else
-            --print("[SCAN DEBUG] AVISO: nome nao encontrado em AnimalsData")
-        end
-        
-        local qualifiesValue = genValue >= MIN_VALUE_CARPET
-        local qualifiesTarget = isTargeted(displayName)
-        local qualifiesUltra = isUltra(displayName)
-        --print(string.format("[SCAN DEBUG] Filtros: valor=%s (min=%s) targeted=%s ultra=%s", tostring(qualifiesValue), tostring(MIN_VALUE_CARPET), tostring(qualifiesTarget), tostring(qualifiesUltra)))
-        if not (qualifiesValue or qualifiesTarget or qualifiesUltra) then
-            lowValueCount = lowValueCount + 1
-            --print("[SCAN DEBUG] DESCARTADO: valor abaixo do minimo e nao targeted/ultra")
-            continue
-        end
-        
+        if isBlacklisted(displayName) then continue end
+        if not (genValue >= MIN_VALUE_CARPET or isTargeted(displayName) or isUltra(displayName)) then continue end
         local genText = genValue > 0 and ("$" .. formatValue(genValue) .. "/s") or "?"
-        local tier = (genValue >= 1e9 or isUltra(displayName)) and "ULTRA" 
-                  or (genValue >= 100e6) and "HIGH" 
-                  or "MID"
-        
-        -- Purchase = esteira/carpet; Steal = brainrot já colocado em uma base.
-        local isBasePrompt = actionLower == "steal"
-        local resultOwner = "Carpet"
-        if isBasePrompt then
-            local node = obj.Parent
-            while node and node ~= Workspace do
-                if node.Parent and node.Parent.Name == "Plots" then
-                    resultOwner = tostring(node:GetAttribute("Owner") or node:GetAttribute("PlayerName") or node.Name)
-                    break
-                end
-                node = node.Parent
-            end
-        end
-        -- Um mesmo brainrot pode possuir várias ProximityPrompts/labels clonadas.
-        -- Usa o caminho do recipiente para preservar cópias reais e eliminar clones do mesmo item.
-        local resultContainer = obj.Parent and obj.Parent:GetFullName() or tostring(obj)
-        local resultKey
-        if isBasePrompt then
-            -- Prompts Steal clonados da mesma base são uma única ocorrência lógica.
-            resultKey = table.concat({"base", tostring(displayName):lower(), tostring(math.floor(genValue or 0)), tostring(resultOwner)}, "|")
-        else
-            resultKey = table.concat({"carpet", tostring(displayName):lower(), tostring(math.floor(genValue or 0)), tostring(resultOwner), resultContainer}, "|")
-        end
-        if uniqueResults[resultKey] then
-            continue
-        end
-        uniqueResults[resultKey] = true
-
-        local result = {
-            tier = tier,
-            name = displayName,
-            gen = genText,
-            value = genValue,
-            mutation = mutation,
-            traits = traits,
-            inDuel = false,
-            ownerName = resultOwner,
-            isCarpet = not isBasePrompt,
-            isBase = isBasePrompt,
-        }
-        if isBasePrompt then
-            table.insert(baseResults, result)
-        else
-            table.insert(results, result)
-        end
-        
-        print(string.format("FOUND %s: %s | Owner: %s | Gen: %s", isBasePrompt and "BASE" or "CARPET", displayName, resultOwner, genText))
+        table.insert(results, {
+            tier = (genValue >= 1e9 or isUltra(displayName)) and "ULTRA" or (genValue >= 100e6) and "HIGH" or "MID",
+            name = displayName .. " (carpet)", gen = genText, value = genValue,
+            mutation = nil, traits = nil, inDuel = false, ownerName = "Carpet", isCarpet = true,
+        })
+        print(string.format("✅ CARPET FOUND: %s | Gen: %s", displayName, genText))
     end
-    
-    --print(string.format("[SCAN DEBUG] RESUMO: total=%d disabled=%d actionMismatch=%d purchase=%d semNome=%d blacklist=%d baixoValor=%d", promptTotal, disabledCount, actionMismatch, carpetCount, noNameCount, blacklistedCount, lowValueCount))
-    --print(string.format("🎠 Carpet scan: %d prompts checked, %d qualifying", carpetCount, #results))
-    --print(string.format("🏠 Steal/base prompts: %d qualifying", #baseResults))
-    --print("[SCAN DEBUG] ===== FIM SCAN CARPET =====")
-    return results, baseResults
-end
-
--- ✅ SCAN DE BASES DOS JOGADORES via TextLabels
-local function scanPlayerBases(seen, currentJobId)
-    local results = {}
-    local labelsChecked = 0
-    local labelsQualifying = 0
-    local uniqueBaseLabels = {}
-    
-    -- Buscar container de bases
-    local basesContainer = Workspace:FindFirstChild("Plots")
-    if not basesContainer then
-        -- Tentar alternativas
-        local alternatives = {"PlayerPlots", "Bases", "PlayerBases"}
-        for _, alt in ipairs(alternatives) do
-            basesContainer = Workspace:FindFirstChild(alt)
-            if basesContainer then break end
-        end
-    end
-    
-    if not basesContainer then
-        --print("🏠 Player bases: container não encontrado")
-        return results
-    end
-    
-    -- Escanear cada base
-    for _, base in ipairs(basesContainer:GetChildren()) do
-        -- Buscar owner da base
-        local ownerName = base:GetAttribute("Owner") or base:GetAttribute("PlayerName")
-        if not ownerName then
-            -- Tentar pelo nome da base (alguns jogos usam player name como nome da base)
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player.Name == base.Name or tostring(player.UserId) == base.Name then
-                    ownerName = player.Name
-                    break
-                end
-            end
-        end
-        
-        if not ownerName then
-            ownerName = "Unknown"
-        else
-            ownerName = tostring(ownerName)
-        end
-        
-        -- Buscar TextLabels com padrão $XXX.XM/s
-        for _, obj in ipairs(base:GetDescendants()) do
-            if not obj:IsA("TextLabel") then continue end
-            
-            local text = obj.Text or ""
-            -- Padrão: $XXX.XM/s, $XXX.XK/s, $XXX.XB/s, etc
-            local valueMatch = text:match("%$([%d%.]+)([KMBTkmbt])%/?s?")
-            
-            if valueMatch then
-                labelsChecked = labelsChecked + 1
-                
-                -- Parse do valor
-                local numStr, suffix = text:match("([%d%.]+)([KMBTkmbt])")
-                if not numStr then continue end
-                
-                local value = tonumber(numStr) or 0
-                local multiplier = ({K=1e3, M=1e6, B=1e9, T=1e12, k=1e3, m=1e6, b=1e9, t=1e12})[suffix] or 1
-                local genValue = value * multiplier
-                
-                -- Procurar o nome em labels próximas e nos ancestrais.
-                -- O nome é resolvido contra AnimalsData para não transformar mutation/trait/número em brainrot.
-                local brainrotName = nil
-                local textCandidates = { text }
-                local node = obj.Parent
-                for _ = 1, 5 do
-                    if not node or node == basesContainer then break end
-                    table.insert(textCandidates, tostring(node.Name or ""))
-                    for _, child in ipairs(node:GetChildren()) do
-                        if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
-                            table.insert(textCandidates, tostring(child.Text or ""))
-                        elseif child:IsA("StringValue") then
-                            table.insert(textCandidates, tostring(child.Value or ""))
-                        end
-                    end
-                    node = node.Parent
-                end
-                if AnimalsData then
-                    local bestLength = 0
-                    for _, candidateText in ipairs(textCandidates) do
-                        local lowText = tostring(candidateText):lower()
-                        for candidate in pairs(AnimalsData) do
-                            local candidateString = tostring(candidate)
-                            if #candidateString > bestLength and lowText:find(candidateString:lower(), 1, true) then
-                                brainrotName = candidateString
-                                bestLength = #candidateString
-                            end
-                        end
-                    end
-                end
-                if not brainrotName or brainrotName == "" then continue end
-
-                -- Reutiliza a extração contextual: somente objetos/atributos marcados
-                -- como Trait/Mutation entram no cálculo deste brainrot.
-                local _, contextualValue, detectedMutation, detectedTraits = findPromptData(obj)
-                local mutation = detectedMutation
-                local traits = detectedTraits or {}
-                if contextualValue and contextualValue > genValue then
-                    genValue = contextualValue
-                end
-                if AnimalsData and AnimalsData[brainrotName] then
-                    local calculatedValue = calculateGenValue(brainrotName, mutation, traits)
-                    if calculatedValue and calculatedValue > 0 then
-                        genValue = calculatedValue
-                    end
-                end
-                
-                -- ✅ FILTRO: Blacklist
-                if isBlacklisted(brainrotName) then continue end
-                
-                -- ✅ FILTRO: MIN_VALUE
-                if not (genValue >= MIN_VALUE or isTargeted(brainrotName) or isUltra(brainrotName)) then continue end
-                
-                -- Labels clonadas/replicadas da mesma base formam uma única ocorrência.
-                local labelKey = table.concat({
-                    tostring(brainrotName):lower(), tostring(math.floor(genValue or 0)),
-                    tostring(ownerName)
-                }, "|")
-                if uniqueBaseLabels[labelKey] then continue end
-                uniqueBaseLabels[labelKey] = true
-                labelsQualifying = labelsQualifying + 1
-                
-                local genText = "$" .. formatValue(genValue) .. "/s"
-                local tier = (genValue >= 1e9 or isUltra(brainrotName)) and "ULTRA" 
-                          or (genValue >= 100e6) and "HIGH" 
-                          or "MID"
-                
-                table.insert(results, {
-                    tier = tier,
-                    name = brainrotName .. " (base)",
-                    gen = genText,
-                    value = genValue,
-                    mutation = nil,
-                    traits = nil,
-                    inDuel = false,
-                    ownerName = ownerName,
-                    isBase = true,
-                })
-                
-                --print(string.format("✅ BASE: %s | Owner: %s | Gen: %s", brainrotName, ownerName, genText))
-            end
-        end
-    end
-    
-    --print(string.format("🏠 Player bases: %d labels checked, %d qualifying", labelsChecked, labelsQualifying))
     return results
 end
 
@@ -939,17 +720,8 @@ local function getBrainrotImage(name)
 end
 
 local function sendWebhook(url, name, value, mutation, allResults, showFields, footer, ownerName, jobId, includeJoinLink, inDuel)
-    --print(string.format("[WEBHOOK DEBUG] Entrada: categoria=%s nome=%s valor=%s owner=%s urlPresent=%s requestType=%s", tostring(footer), tostring(name), tostring(value), tostring(ownerName), tostring(url and url ~= ""), tostring(type(http_request))))
-    if not url or url == "" then
-        --print("[WEBHOOK DEBUG] CANCELADO: URL vazia")
-        return false
-    end
-    if type(http_request) ~= "function" then
-        --print("[WEBHOOK DEBUG] CANCELADO: http_request não é função")
-        return false
-    end
+    if not url or url == "" then return end
     local imageUrl = getBrainrotImage(name)
-    --print("[WEBHOOK DEBUG] Imagem resolvida: " .. tostring(imageUrl ~= nil))
     local joinLink = "https://liphyrdev.github.io/notifier/?placeId=109983668079237&gameInstanceId=" .. (jobId or CURRENT_JOB)
     local mutEmoji = getMutEmoji(mutation):gsub("%s+$", "")
     local genText = "$" .. formatValue(value) .. "/s"
@@ -983,33 +755,22 @@ end
     end
 
     local otherBrainrots = {}
-    local seenOther = {}
     if type(allResults) == "table" then
         for _, r in ipairs(allResults) do
             if r.name ~= name then
-                local traitKey = r.traits and table.concat(r.traits, ",") or ""
-                local mutKey = tostring(r.mutation or "")
-                local dedupeKey = tostring(r.name or "") .. "|" .. mutKey .. "|" .. traitKey .. "|" .. tostring(r.gen or "")
-                if not seenOther[dedupeKey] then
-                    seenOther[dedupeKey] = true
-                    local rMut = getMutEmoji(r.mutation):gsub("%s+$", "")
-                    local traitText = ""
-                    if r.traits and #r.traits > 0 then
-                        local temp = {}
-                        for _, tr in ipairs(r.traits) do table.insert(temp, TRAIT_EMOJIS[tr] or tr) end
-                        traitText = table.concat(temp, " ")
-                    end
-                    table.insert(otherBrainrots, string.format("%s・%s%s — %s", rMut, r.name, traitText ~= "" and (" " .. traitText) or "", r.gen))
+                local rMut = getMutEmoji(r.mutation):gsub("%s+$", "")
+                local traitText = ""
+                if r.traits and #r.traits > 0 then
+                    local temp = {}
+                    for _, tr in ipairs(r.traits) do table.insert(temp, TRAIT_EMOJIS[tr] or tr) end
+                    traitText = table.concat(temp, " ")
                 end
+                table.insert(otherBrainrots, string.format("%s・%s%s — %s", rMut, r.name, traitText ~= "" and (" " .. traitText) or "", r.gen))
             end
         end
     end
 
     local footerText = "-# Bob Notifier " .. (inDuel and "| ⚔️ Duel " or "") .. "| <t:" .. os.time() .. ":R> | `Made by Kzzin`" .. (url == WEBHOOK_ULTRA and " | @everyone" or "")
-    local embedFields = {}
-    if #otherBrainrots > 0 then
-        table.insert(embedFields, { name = "Other", value = table.concat(otherBrainrots, "\n"), inline = false })
-    end
 
     local components = {{
         type = 17,
@@ -1028,71 +789,21 @@ end
     end
 
     table.insert(components[1].components, { type = 14, divider = true, spacing = 1 })
-
-    -- Botão de compra somente nas webhooks MI, HIGH e ULTRA.
-    -- O Job ID e o botão de entrada continuam exclusivos da WEBHOOK_URL.
-    if isKeyWebhook then
-        table.insert(components[1].components, {
-            type = 1,
-            components = {{
-                type = 2,
-                style = 5,
-                label = "Click Here To Buy Your Key!",
-                url = "https://discord.com/channels/1477872742933069846/1477912919441408101",
-                emoji = { id = "1502528698757156924" }
-            }}
-        })
+    if not isKeyWebhook then
+        table.insert(components[1].components, { type = 10, content = "## <:id2:1502543195488256160> • Job ID\n\n`" .. tostring(jobId or CURRENT_JOB) .. "`" })
+        table.insert(components[1].components, { type = 1, components = {{ type = 2, style = 5, label = "Click Here To Join!", url = joinLink, emoji = { id = "1502063760024801331" } }} })
+    else
+        table.insert(components[1].components, { type = 1, components = {{ type = 2, style = 5, label = "Click Here To Buy Your Key!", url = "https://discord.com/channels/1477872742933069846/1477912919441408101", emoji = { id = "1502528698757156924" } }} })
     end
-
+    table.insert(components[1].components, { type = 14, divider = true, spacing = 1 })
     table.insert(components[1].components, { type = 10, content = footerText })
 
-    local payload = { username = NOTIFIER_NAME, flags = 32768, components = components }
-    local encodeOk, encodeResult = pcall(function() return HttpService:JSONEncode(payload) end)
-    --print(string.format("[WEBHOOK DEBUG] BobHop payload: ok=%s bytes=%s", tostring(encodeOk), tostring(encodeOk and #encodeResult or encodeResult)))
-    --print(string.format("[WEBHOOK] Enviando %s | nome=%s | valor=%s | owner=%s", footer, tostring(name), tostring(value), tostring(ownerName)))
-    local ok, response = pcall(function()
-        return http_request({
+    pcall(function()
+        http_request({
             Url = url, Method = "POST", Headers = { ["Content-Type"] = "application/json" },
-            Body = encodeResult
+            Body = HttpService:JSONEncode({ username = NOTIFIER_NAME, flags = 32768, components = components })
         })
     end)
-    if not ok then
-        --print("[WEBHOOK] ERRO: " .. tostring(response))
-    elseif response then
-        --print(string.format("[WEBHOOK] Resposta HTTP: %s | body=%s", tostring(response.StatusCode or response.Status or "?"), tostring(response.Body or ""):sub(1, 300)))
-    else
-        --print("[WEBHOOK] Sem resposta do executor")
-    end
-
-    -- O log de Job ID vai somente para WEBHOOK_URL; as webhooks MI/HIGH/ULTRA
-    -- recebem apenas o embed do brainrot acima.
-    if WEBHOOK_URL and WEBHOOK_URL ~= "" and url ~= WEBHOOK_URL then
-        local jobComponents = {{ type = 17, components = {} }}
-        local source = components[1].components
-        local sourceCount = #source
-        local copyUntil = math.max(0, sourceCount - 2) -- remove divider/rodapé finais
-        for i = 1, copyUntil do
-            table.insert(jobComponents[1].components, source[i])
-        end
-        table.insert(jobComponents[1].components, { type = 14, divider = true, spacing = 1 })
-        table.insert(jobComponents[1].components, { type = 10, content = "## <:id2:1502543195488256160> • Job ID\n\n`" .. tostring(jobId or CURRENT_JOB) .. "`" })
-        table.insert(jobComponents[1].components, { type = 1, components = {{ type = 2, style = 5, label = "Click Here To Join!", url = joinLink, emoji = { id = "1502063760024801331" } }} })
-        table.insert(jobComponents[1].components, { type = 14, divider = true, spacing = 1 })
-        table.insert(jobComponents[1].components, { type = 10, content = footerText })
-
-        local jobPayload = { username = NOTIFIER_NAME, flags = 32768, components = jobComponents }
-        local jobOk, jobBody = pcall(function() return HttpService:JSONEncode(jobPayload) end)
-        if jobOk then
-            pcall(function()
-                http_request({
-                    Url = WEBHOOK_URL,
-                    Method = "POST",
-                    Headers = { ["Content-Type"] = "application/json" },
-                    Body = jobBody
-                })
-            end)
-        end
-    end
 end
 
 local function sendToRailwayAPI(name, jobId, genText, value, key, ownerName, currentPlayers, maxPlayers, placeId)
@@ -1115,8 +826,7 @@ local function sendToRailwayAPI(name, jobId, genText, value, key, ownerName, cur
     end)
 end
 
--- Mantém o histórico por 24h para não revisitar servidores durante o ciclo normal.
-local VISITED_EXPIRY = 86400
+local VISITED_EXPIRY = 600 -- 10 minutos (era 1h — muito longo com 18 contas)
 math.randomseed(os.clock() * 1000000 + (LocalPlayer and LocalPlayer.UserId or 0))
 
 -- Offset por conta: diversifica qual pool de servidores cada instância prioriza
@@ -1130,21 +840,15 @@ local function getVisitedServers()
         return "{}"
     end)
     local success, data = pcall(function() return HttpService:JSONDecode(ok and content or "{}") end)
-    if success and type(data) == "table" then return data end
-    return {}
+    return success and data or {}
 end
 
 local function saveVisitedServers(data)
     pcall(function()
-        if writefile and type(data) == "table" then
+        if writefile then
             writefile("visited_servers.json", HttpService:JSONEncode(data))
         end
     end)
-end
-
-local function visitedHas(visited, serverId)
-    local id = tostring(serverId or "")
-    return id ~= "" and visited[id] ~= nil
 end
 
 local screenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
@@ -1177,71 +881,6 @@ local function scoreServer(server)
     return score + math.random(0, 35)
 end
 
--- ════════════════════════════════════════════════════════════
--- CACHE COMPARTILHADO DE SERVIDORES (ANTI RATE LIMIT)
--- ════════════════════════════════════════════════════════════
--- Cache local com TTL de 120 segundos (2 minutos) + randomização
-local SERVER_CACHE_TTL = 120
-local lastCacheFetch = 0
-local cachedServers = nil
-local instanceRandomOffset = math.random(0, 30) -- Offset aleatório 0-30s por instância
-
--- Função para buscar servidores DO RAILWAY (cache compartilhado)
-local function getServersFromCache(placeId)
-    local now = os.time()
-    
-    -- TTL com offset aleatório para evitar todas instâncias expirarem juntas
-    local effectiveTTL = SERVER_CACHE_TTL - instanceRandomOffset
-    
-    -- Se tem cache local válido, usar
-    if cachedServers and (now - lastCacheFetch) < effectiveTTL then
-        --print(string.format("[HOP CACHE] ✅ Usando cache local (idade: %ds/%ds, %d servidores)", 
-            -- now - lastCacheFetch, effectiveTTL, #cachedServers))
-        return cachedServers
-    end
-    
-    -- Buscar do Railway
-    --print("[HOP CACHE] Buscando servidores do Railway...")
-    local ok, resp = pcall(function()
-        return http_request({
-            Url = RAILWAY_API .. "/api/servers/cache?placeId=" .. tostring(placeId),
-            Method = "GET",
-            Headers = {
-                ["Content-Type"] = "application/json",
-                ["Authorization"] = RAILWAY_SECRET,
-                ["X-Bob-Client"] = RAILWAY_CLIENT,
-                ["X-Bob-Secret"] = RAILWAY_SECRET
-            }
-        })
-    end)
-    
-    if ok and resp and tonumber(resp.StatusCode or resp.Status or 0) == 200 then
-        local decoded, data = pcall(function()
-            return HttpService:JSONDecode(tostring(resp.Body or ""))
-        end)
-        if decoded and type(data) == "table" and type(data.servers) == "table" and #data.servers > 0 then
-            cachedServers = data.servers
-            lastCacheFetch = now
-            --print(string.format("[HOP CACHE] ✅ Cache Railway atualizado: %d servidores", #cachedServers))
-            return cachedServers
-        end
-    end
-
-    -- Mesmo vencido, o cache em memória é melhor que parar o hop.
-    if cachedServers and #cachedServers > 0 then
-        return cachedServers
-    end
-    
-    -- Falhou ao buscar do Railway
-    if ok and resp then
-        --print(string.format("[HOP CACHE] ⚠️ Railway respondeu %d - buscando da API Roblox...", resp.StatusCode))
-    else
-        --print("[HOP CACHE] ⚠️ Railway falhou - buscando da API Roblox...")
-    end
-    return nil
-end
-
--- Função para buscar servidores DA API DO ROBLOX e salvar no Railway
 local function fetchAllServers(placeId)
     local allServers = {}
     local seenIds    = {}
@@ -1252,8 +891,6 @@ local function fetchAllServers(placeId)
     local sortOrder = ACCOUNT_POOL_OFFSET % 2 == 0 and "Asc" or "Desc"
     local cursor    = nil
 
-    --print("[HOP API] 🔍 Buscando servidores da API Roblox...")
-    
     for page = 1, 2 do
         local url = "https://games.roblox.com/v1/games/" .. placeId
                     .. "/servers/Public?sortOrder=" .. sortOrder .. "&limit=100"
@@ -1261,232 +898,66 @@ local function fetchAllServers(placeId)
             url = url .. "&cursor=" .. HttpService:UrlEncode(cursor)
         end
 
-        local ok, body
-        local retryDelay = 1
-        for attempt = 1, 3 do
-            ok, body = pcall(function() return game:HttpGet(url) end)
-            if ok and type(body) == "string" and body ~= "" then break end
-            if attempt < 3 then
-                task.wait(retryDelay)
-                retryDelay = math.min(retryDelay * 2, 4)
-            end
-        end
+        local ok, body = pcall(function() return game:HttpGet(url) end)
 
-        if not ok or type(body) ~= "string" or body == "" then
-            -- A API pode estar temporariamente indisponível; usa cache/fallback sem crashar.
+        if not ok or not body or body == "" then
+            print("[HOP] HttpGet falhou (page=" .. page .. ")")
             break
         end
 
-        --print("[HOP API] Página " .. page .. ": " .. tostring(body):sub(1, 120))
+        print("[HOP] Body[" .. page .. "]: " .. tostring(body):sub(1, 120))
 
         local parsed, result = pcall(function() return HttpService:JSONDecode(body) end)
 
         if not parsed then
-            --print("[HOP API] ❌ JSON parse error (page=" .. page .. ")")
+            print("[HOP] JSON parse error (page=" .. page .. ")")
             break
         end
 
         -- API retornou erro (429, 403, etc)
-        if type(result) ~= "table" then
-            break
-        end
-
         if result.errors then
             local errMsg = (result.errors[1] and result.errors[1].message) or "unknown"
-            --print("[HOP API] ⚠️ API error página " .. page .. ": " .. errMsg)
-            
-            -- ✅ Se for erro vazio (rate limit), aguarda mais tempo
-            if errMsg == "" or errMsg == "unknown" then
-                --print("[HOP API] ⚠️ Possível rate limit, aguardando 10s...")
-                if page == 1 then task.wait(10) end
-            else
-                if page == 1 then task.wait(5) end
-            end
+            print("[HOP] API error página " .. page .. ": " .. errMsg)
+            -- Page 1 com erro: aguarda antes de retornar
+            -- Page 2 com erro: usa o que coletou da page 1, sem esperar
+            if page == 1 then task.wait(5) end
             break
         end
 
-        if type(result.data) ~= "table" then
+        if type(result) ~= "table" or not result.data then
+            print("[HOP] Resposta inesperada (sem .data) page=" .. page)
             break
         end
 
         for _, server in ipairs(result.data) do
-            if type(server) == "table" and server.id then
-                local serverId = tostring(server.id)
-                if not seenIds[serverId] then
-                    seenIds[serverId] = true
-                    server.id = serverId
-                    table.insert(allServers, server)
-                end
+            if not seenIds[server.id] then
+                seenIds[server.id] = true
+                table.insert(allServers, server)
             end
         end
 
         cursor = result.nextPageCursor
         if not cursor or cursor == "" then break end
-        task.wait(1)  -- ✅ Aumentado de 0.5s para 1s entre páginas
-    end
-
-    -- ✅ NOVO: Salvar localmente como fallback (ANTES de tentar Railway)
-    local cacheData = {
-        servers = allServers,
-        timestamp = os.time(),
-        count = #allServers
-    }
-    
-    local saveOk = pcall(function()
-        writefile("bobhop_cache.json", HttpService:JSONEncode(cacheData))
-    end)
-    
-    if saveOk and #allServers > 0 then
-        --print(string.format("[HOP LOCAL] ✅ %d servidores salvos localmente", #allServers))
-    end
-
-    -- Salvar no Railway se conseguiu buscar servidores
-    if #allServers > 0 then
-        --print(string.format("[HOP API] 💾 Salvando %d servidores no Railway...", #allServers))
-        local ok, resp = pcall(function()
-            return http_request({
-                Url = RAILWAY_API .. "/api/servers/cache",
-                Method = "POST",
-                Headers = {
-                    ["Content-Type"] = "application/json",
-                    ["Authorization"] = RAILWAY_SECRET,
-                    ["X-Bob-Client"] = RAILWAY_CLIENT,
-                    ["X-Bob-Secret"] = RAILWAY_SECRET
-                },
-                Body = HttpService:JSONEncode({
-                    placeId = tostring(placeId),
-                    servers = allServers,
-                    ttl = SERVER_CACHE_TTL
-                })
-            })
-        end)
-        
-        if ok and resp and resp.StatusCode == 200 then
-            --print("[HOP API] ✅ Cache salvo no Railway!")
-            cachedServers = allServers
-            lastCacheFetch = os.time()
-        else
-            local status = (ok and resp) and resp.StatusCode or "erro"
-            --print("[HOP API] ⚠️ Falha ao salvar no Railway (status: " .. tostring(status) .. ")")
-        end
-    else
-        --print("[HOP API] ⚠️ Nenhum servidor encontrado para cachear")
+        task.wait(0.5)
     end
 
     return allServers
 end
 
--- ✅ NOVO: Buscar do cache local (fallback quando API e Railway falham)
-local function getLocalCache()
-    local fileCheckOk, hasFile = pcall(function()
-        return type(isfile) == "function" and isfile("bobhop_cache.json") == true
-    end)
-    if not fileCheckOk or not hasFile then
-        --print("[HOP LOCAL] ⚠️ Cache local não existe")
-        return nil
-    end
-    
-    local ok, data = pcall(function()
-        local content = readfile("bobhop_cache.json")
-        return HttpService:JSONDecode(content)
-    end)
-    
-    if not ok or not data or not data.servers then
-        --print("[HOP LOCAL] ⚠️ Erro ao ler cache local")
-        return nil
-    end
-    
-    local age = os.time() - (data.timestamp or 0)
-    local maxAge = 300  -- 5 minutos
-    
-    if age > maxAge then
-        --print(string.format("[HOP LOCAL] ⚠️ Cache local expirado (idade: %ds)", age))
-        return nil
-    end
-    
-    if data.count == 0 or #data.servers == 0 then
-        --print("[HOP LOCAL] ⚠️ Cache local vazio")
-        return nil
-    end
-    
-    --print(string.format("[HOP LOCAL] ✅ Cache local válido - %d servidores (idade: %ds)", data.count, age))
-    return data.servers
-end
-
--- Função principal: buscar servidores (usa cache Railway > cache local > API)
-local function normalizeServerList(servers)
-    if type(servers) ~= "table" then return {} end
-    local normalized, ids = {}, {}
-    for _, server in ipairs(servers) do
-        if type(server) == "table" and server.id then
-            local id = tostring(server.id)
-            if id ~= "" and not ids[id] then
-                ids[id] = true
-                server.id = id
-                table.insert(normalized, server)
-            end
-        end
-    end
-    return normalized
-end
-
-local function getServerList(placeId)
-    -- 1️⃣ Tentar buscar do Railway cache primeiro
-    local servers = getServersFromCache(placeId)
-    
-        if servers and #servers > 0 then
-        return normalizeServerList(servers)
-    end
-    
-    -- 2️⃣ Railway falhou, tentar cache local (fallback)
-    --print("[HOP] ⚠️ Railway indisponível, tentando cache local...")
-    servers = getLocalCache()
-    
-    if servers and #servers > 0 then
-        --print("[HOP] ✅ Usando cache local como fallback")
-        return normalizeServerList(servers)
-    end
-    
-    -- 3️⃣ Ambos falharam, buscar da API e cachear
-    --print("[HOP] ⚠️ Cache local também falhou, buscando da API...")
-    return normalizeServerList(fetchAllServers(placeId))
-end
-
--- Fallback interno: deixa o matchmaking público do Roblox escolher um servidor.
--- Não depende do Railway, cache local ou lista externa de Job IDs.
-local function internalPublicServerFallback(label)
-    label = tostring(label or "Bob Notifier")
-    text.Text = "🌐 Servidor público automático..."
-    local ok, err = pcall(function()
-        TeleportService:Teleport(PLACE_ID, LocalPlayer)
-    end)
-    if not ok then
-        text.Text = "⏳ Fallback público indisponível; tentando novamente..."
-        return false, err
-    end
-    return true
-end
-
 local function startInfiniteHop(label)
-    label = tostring(label or "Bob Notifier")
-    debugLog("HOP: startInfiniteHop iniciado; label=" .. label .. " currentJob=" .. tostring(game.JobId))
-    --print("[HOP] Sistema iniciado...")
+    print("[HOP] Sistema iniciado...")
     if not game:IsLoaded() then game.Loaded:Wait() end
     task.wait(0.3)
 
     local visited = getVisitedServers()
-    local visitedCount = 0
-    for _ in pairs(visited) do visitedCount = visitedCount + 1 end
-    debugLog("HOP: histórico carregado; visitados=" .. tostring(visitedCount))
-    -- O servidor atual também entra no histórico antes da primeira consulta.
-    visited[tostring(game.JobId)] = os.time()
+    visited[game.JobId] = os.time()
     saveVisitedServers(visited)
 
     -- Fila local de candidatos: só chama a API quando esvaziar
     local candidateQueue  = {}
     local lastFetchTime   = 0
     local apiFails        = 0
-    local MIN_FETCH_GAP   = 30  -- ✅ 30 segundos entre fetches (mais seguro para VPS com múltiplas instâncias)
+    local MIN_FETCH_GAP   = 15  -- segundos mínimos entre fetches
 
     local function refillQueue()
         -- Enforça cooldown entre chamadas à API
@@ -1494,7 +965,7 @@ local function startInfiniteHop(label)
         local gap = now - lastFetchTime
         if gap < MIN_FETCH_GAP then
             local wait = MIN_FETCH_GAP - gap
-            --print("[HOP] Cooldown API: aguardando " .. wait .. "s")
+            print("[HOP] Cooldown API: aguardando " .. wait .. "s")
             text.Text = "⏳ Cooldown API (" .. wait .. "s)..."
             task.wait(wait)
         end
@@ -1502,76 +973,14 @@ local function startInfiniteHop(label)
         text.Text = "🔍 Buscando servidores..."
         lastFetchTime = os.time()
 
-        local allServers = getServerList(PLACE_ID)
-        debugLog("HOP: lista recebida; servidores=" .. tostring(type(allServers) == "table" and #allServers or -1) .. "; apiFails=" .. tostring(apiFails))
-        --print("[HOP] Pool total: " .. #allServers .. " servidores")
+        local allServers = fetchAllServers(PLACE_ID)
+        print("[HOP] Pool total: " .. #allServers .. " servidores")
 
         if #allServers == 0 then
             apiFails = apiFails + 1
-            -- ✅ Backoff progressivo mas limitado: 30s, 60s, 120s, 180s (max 3min)
-            local backoff = math.min(30 * apiFails, 180)
-            --print("[HOP] API falhou " .. apiFails .. "x — backoff " .. backoff .. "s")
-            text.Text = "⏳ API temporariamente indisponível (" .. backoff .. "s)..."
-            
-            -- ✅ CRÍTICO: Se falhar 3x seguidas, usa cache local como fallback
-            if apiFails >= 3 then
-                --print("[HOP] ⚠️ 3 falhas seguidas — tentando cache local...")
-                local localServers = getLocalCache()
-                
-                if localServers and #localServers > 0 then
-                    --print(string.format("[HOP] ✅ Usando %d servidores do cache local!", #localServers))
-                    apiFails = 0  -- Reset porque encontrou servidores
-                    
-                    -- Processa os servidores do cache local
-                    local curNow = os.time()
-                    local curVisited = getVisitedServers()
-                    for id, ts in pairs(curVisited) do
-                        if curNow - ts > VISITED_EXPIRY then curVisited[id] = nil end
-                    end
-                    saveVisitedServers(curVisited)
-                    
-                    local scored = {}
-                    for _, server in ipairs(localServers) do
-                        local serverId = tostring(server.id or "")
-                        if serverId == tostring(game.JobId) then continue end
-                        if visitedHas(curVisited, tostring(server.id or "")) then continue end
-                        local score = scoreServer(server)
-                        if score > 0 then
-                            table.insert(scored, { server = server, score = score })
-                        end
-                    end
-                    
-                    if #scored == 0 and #localServers > 0 then
-                        --print("[HOP] Todos cheios — usando fallback (servidores menos lotados)")
-                        for _, server in ipairs(localServers) do
-                            local serverId = tostring(server.id or "")
-                        if serverId == tostring(game.JobId) then continue end
-                            if visitedHas(curVisited, tostring(server.id or "")) then continue end
-                            local playing = server.playing or 0
-                            local score = math.max(1, 20 - playing) + math.random(0, 10)
-                            table.insert(scored, { server = server, score = score })
-                        end
-                    end
-                    
-                    table.sort(scored, function(a, b) return a.score > b.score end)
-                    
-                    candidateQueue = {}
-                    for _, entry in ipairs(scored) do
-                        if entry and entry.server and entry.server.id then
-                            table.insert(candidateQueue, entry.server)
-                        end
-                    end
-                    
-                    --print("[HOP] Candidatos na fila (cache local): " .. #candidateQueue)
-                    return #candidateQueue > 0
-                end
-                
-                -- ✅ Se cache local também falhou, limpa visited e reseta
-                --print("[HOP] ⚠️ Cache local vazio — limpando cache visited")
--- Mantém o histórico para nunca revisitar automaticamente.
-                apiFails = 0
-            end
-            
+            local backoff = math.min(apiFails * 8, 40)
+            print("[HOP] API falhou " .. apiFails .. "x — backoff " .. backoff .. "s")
+            text.Text = "⏳ API indisponível, aguardando " .. backoff .. "s..."
             task.wait(backoff)
             return false
         end
@@ -1581,7 +990,7 @@ local function startInfiniteHop(label)
         -- Debug: mostra dados do primeiro servidor pra validar estrutura
         if #allServers > 0 then
             local s = allServers[1]
-            --print("[HOP DEBUG] playing=" .. tostring(s.playing) .. " maxPlayers=" .. tostring(s.maxPlayers) .. " id=" .. tostring(s.id):sub(1, 8))
+            print("[HOP DEBUG] playing=" .. tostring(s.playing) .. " maxPlayers=" .. tostring(s.maxPlayers) .. " id=" .. tostring(s.id):sub(1, 8))
         end
 
         local curNow     = os.time()
@@ -1593,9 +1002,8 @@ local function startInfiniteHop(label)
 
         local scored = {}
         for _, server in ipairs(allServers) do
-            local serverId = tostring(server.id or "")
-            if serverId == tostring(game.JobId) then continue end
-            if visitedHas(curVisited, tostring(server.id or "")) then continue end
+            if server.id == game.JobId  then continue end
+            if curVisited[server.id]    then continue end
             local score = scoreServer(server)
             if score > 0 then
                 table.insert(scored, { server = server, score = score })
@@ -1604,11 +1012,10 @@ local function startInfiniteHop(label)
 
         -- Fallback: se todos estão cheios, tenta mesmo assim com os menos cheios
         if #scored == 0 and #allServers > 0 then
-            --print("[HOP] Todos cheios — usando fallback (servidores menos lotados)")
+            print("[HOP] Todos cheios — usando fallback (servidores menos lotados)")
             for _, server in ipairs(allServers) do
-                local serverId = tostring(server.id or "")
-                        if serverId == tostring(game.JobId) then continue end
-                if visitedHas(curVisited, tostring(server.id or "")) then continue end
+                if server.id == game.JobId then continue end
+                if curVisited[server.id]   then continue end
                 local playing = server.playing or 0
                 local score   = math.max(1, 20 - playing) + math.random(0, 10)
                 table.insert(scored, { server = server, score = score })
@@ -1619,14 +1026,10 @@ local function startInfiniteHop(label)
 
         candidateQueue = {}
         for _, entry in ipairs(scored) do
-            -- ✅ FIX: Insere o servidor DIRETAMENTE (não entry.server)
-            if entry and entry.server and entry.server.id then
-                table.insert(candidateQueue, entry.server)
-            end
+            table.insert(candidateQueue, entry.server)
         end
 
-        debugLog("HOP: candidatos novos na fila=" .. tostring(#candidateQueue) .. "; histórico=" .. tostring((function() local n=0 for _ in pairs(curVisited) do n=n+1 end return n end)()))
-        --print("[HOP] Candidatos na fila: " .. #candidateQueue)
+        print("[HOP] Candidatos na fila: " .. #candidateQueue)
         return #candidateQueue > 0
     end
 
@@ -1636,71 +1039,46 @@ local function startInfiniteHop(label)
     while true do
         -- Fila vazia: busca novos servidores
         if #candidateQueue == 0 then
-            --print("[HOP] Fila vazia — re-fetching...")
+            print("[HOP] Fila vazia — re-fetching...")
             local hasNew = refillQueue()
             if not hasNew then
-                -- Não apaga o histórico: isso faria o bot revisitar servidores.
-                -- Aguarda a próxima atualização da API/cache por novos servidores.
-                -- Último recurso: matchmaking público interno do Roblox.
-                -- Ele não exige a API e deixa o Roblox escolher um servidor público.
-                local fallbackOk, fallbackErr = internalPublicServerFallback(label)
-                if not fallbackOk then
-                    task.wait(30)
-                    lastFetchTime = 0
-                end
+                -- Sem servidores novos: limpa metade do visited e tenta novamente
+                local curVisited = getVisitedServers()
+                local entries = {}
+                for id, ts in pairs(curVisited) do table.insert(entries, { id = id, ts = ts }) end
+                table.sort(entries, function(a, b) return a.ts < b.ts end)
+                local removeCount = math.max(1, math.floor(#entries * 0.5))
+                for i = 1, removeCount do curVisited[entries[i].id] = nil end
+                saveVisitedServers(curVisited)
+                print("[HOP] Cache parcial limpo (" .. removeCount .. " entradas).")
+                text.Text = "🔄 Cache limpo, aguardando..."
+                refillQueue()
                 continue
             end
         end
 
-        -- ✅ FIX ROBUSTO: Pega o próximo servidor (já é o objeto server direto)
-        local server = table.remove(candidateQueue, 1)
-        
-        -- Validação robusta: verifica se server existe e tem ID
-        if not server then 
-            --print("[HOP] ⚠️ Servidor nil na fila, pulando...")
-            continue 
-        end
-        
-        if type(server) ~= "table" then
-            --print("[HOP] ⚠️ Servidor não é table (tipo: " .. type(server) .. "), pulando...")
-            continue
-        end
-        
-        if not server.id or server.id == "" then
-            --print("[HOP] ⚠️ Servidor sem ID válido, pulando...")
-            continue
-        end
+        -- Pega o próximo da fila (top scored, com ruído já aplicado no scoreServer)
+        local chosen = table.remove(candidateQueue, 1)
+        if not chosen then continue end
 
-        local serverId = tostring(server.id or "")
-        debugLog("HOP: candidato selecionado=" .. serverId)
-        -- Última trava: uma fila antiga nunca pode enviar para um Job ID visitado.
+        -- Marcar como visitado
         local curVisited = getVisitedServers()
-        if visitedHas(curVisited, serverId) or serverId == tostring(game.JobId) then
-            debugLog("HOP: candidato bloqueado por já visitado/atual=" .. serverId)
-            continue
-        end
-        curVisited[serverId] = os.time()
+        curVisited[chosen.id] = os.time()
         saveVisitedServers(curVisited)
-        local playing = tonumber(server.playing) or 0
-        local maxPlayers = tonumber(server.maxPlayers) or 8
-        text.Text = "📡 " .. label .. " → " .. string.sub(serverId, 1, 8)
-                    .. "... (" .. tostring(playing) .. "/" .. tostring(maxPlayers) .. ")"
-        --print("[HOP] → " .. serverId .. " | Players: " .. tostring(playing)
-        --              .. "/" .. tostring(maxPlayers) .. " | Fila restante: " .. tostring(#candidateQueue))
 
-        debugLog("HOP: tentando teleport para=" .. serverId .. "; players=" .. tostring(playing) .. "/" .. tostring(maxPlayers))
+        text.Text = "📡 " .. label .. " → " .. string.sub(chosen.id, 1, 8)
+                    .. "... (" .. chosen.playing .. "/" .. (chosen.maxPlayers or 8) .. ")"
+        print("[HOP] → " .. chosen.id .. " | Players: " .. chosen.playing
+              .. "/" .. (chosen.maxPlayers or 8) .. " | Fila restante: " .. #candidateQueue)
+
         local teleOk, err = pcall(function()
-            TeleportService:TeleportToPlaceInstance(PLACE_ID, server.id, LocalPlayer)
+            TeleportService:TeleportToPlaceInstance(PLACE_ID, chosen.id, LocalPlayer)
         end)
 
         if not teleOk then
-            debugLog("HOP: teleport falhou=" .. tostring(err))
-            --print("[HOP] ⚠️ Teleporte falhou: " .. tostring(err))
-            curVisited[serverId] = nil
+            print("[HOP] ⚠️ Teleporte falhou: " .. tostring(err))
+            curVisited[chosen.id] = nil
             saveVisitedServers(curVisited)
-        else
-            -- ✅ Notifica "bobnotifier10 entrou xxxxx (Job ID)" no Railway/Discord
-            notifyEntry(serverId, label)
         end
 
         task.wait(2)
@@ -1712,151 +1090,60 @@ local function getUserKey()
     return (ok and key ~= "") and key or "Shadow"
 end
 
--- ✅ AUTO-EXECUTE: aguarda prompts e AnimalsData realmente carregarem
-local function waitForScanReady()
-    local timeoutAt = os.clock() + 25
-    local lastPromptCount = -1
-    --print("[SCAN READY] Aguardando mapa, prompts e AnimalsData...")
-    while os.clock() < timeoutAt do
-        if not game:IsLoaded() then game.Loaded:Wait() end
-
-        -- Recarrega AnimalsData se o auto-execute tentou require cedo demais.
-        if not AnimalsData or next(AnimalsData) == nil then
-            pcall(function()
-                local datas = RS:FindFirstChild("Datas")
-                local animalsModule = datas and datas:FindFirstChild("Animals")
-                if animalsModule then AnimalsData = require(animalsModule) end
-            end)
-        end
-
-        local promptCount = 0
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("ProximityPrompt") and obj.Enabled then
-                promptCount = promptCount + 1
-            end
-        end
-        if promptCount ~= lastPromptCount then
-            debugLog("READY: prompts ativos=" .. tostring(promptCount) .. "; AnimalsData=" .. tostring(AnimalsData and next(AnimalsData) ~= nil))
-            --print(string.format("[SCAN READY] prompts ativos=%d AnimalsData=%s", promptCount, tostring(AnimalsData and next(AnimalsData) ~= nil)))
-            lastPromptCount = promptCount
-        end
-
-        if promptCount > 0 and AnimalsData and next(AnimalsData) ~= nil then
-            task.wait(1.5)
-            debugLog("READY: condições atendidas; iniciando scan")
-            --print("[SCAN READY] Pronto; iniciando scan agora")
-            return true
-        end
-        task.wait(1)
-    end
-    debugLog("READY: timeout; executando scan com dados disponíveis")
-    --print("[SCAN READY] Timeout; executando scan com os dados disponíveis")
-    return false
-end
-
-waitForScanReady()
-
 local detectedJobId = game.JobId
 local found = false
 
-local duelPlayers = getDuelPlayers()
-local seen = {}
+if _G.XenSyncGet then
+    local duelPlayers = getDuelPlayers()
+    local seen = {}
+    local results = scanPlots(duelPlayers, seen, detectedJobId)
+    local carpetResults = scanCarpet(seen, detectedJobId)
+    for _, r in ipairs(carpetResults) do table.insert(results, r) end
+    print(string.format("📦 Plots: %d | 🎠 Carpet: %d | Total: %d", #results - #carpetResults, #carpetResults, #results))
 
-debugLog("SCAN: iniciando carpet/base; job=" .. tostring(detectedJobId))
-local carpetResults, stealBaseResults = scanCarpet(seen, detectedJobId)
-debugLog("SCAN: carpet=" .. tostring(#carpetResults) .. "; stealBase=" .. tostring(#stealBaseResults))
-local labelBaseResults = scanPlayerBases(seen, detectedJobId)
-debugLog("SCAN: labelBase=" .. tostring(#labelBaseResults))
+    if type(results) == "table" and #results > 0 then
+        found = true
 
--- Combinar resultados sem duplicar o mesmo brainrot lido por prompt e por label.
-local baseResults = {}
-local mergedBaseKeys = {}
-local function addUniqueBaseResult(r)
-    local key = table.concat({
-        tostring(r.name or ""):lower(), tostring(math.floor(r.value or 0)),
-        tostring(r.ownerName or "")
-    }, "|")
-    if not mergedBaseKeys[key] then
-        mergedBaseKeys[key] = true
-        table.insert(baseResults, r)
-    end
-end
-for _, r in ipairs(stealBaseResults) do addUniqueBaseResult(r) end
-for _, r in ipairs(labelBaseResults) do addUniqueBaseResult(r) end
-
-local allResults = {}
-local mergedAllKeys = {}
-local function addUniqueResult(r)
-    local key = table.concat({
-        tostring(r.name or ""):lower(), tostring(math.floor(r.value or 0)),
-        tostring(r.ownerName or ""), tostring(r.isBase == true)
-    }, "|")
-    if not mergedAllKeys[key] then
-        mergedAllKeys[key] = true
-        table.insert(allResults, r)
-    end
-end
-for _, r in ipairs(carpetResults) do addUniqueResult(r) end
-for _, r in ipairs(baseResults) do addUniqueResult(r) end
-
-debugLog("SCAN: final carpet=" .. tostring(#carpetResults) .. "; bases=" .. tostring(#baseResults) .. "; total=" .. tostring(#allResults))
---print(string.format("🎠 Carpet: %d | 🏠 Bases: %d | Total: %d", #carpetResults, #baseResults, #allResults))
-
-if type(allResults) == "table" and #allResults > 0 then
-    found = true
-
-    local bestUltra = nil
-    for _, r in ipairs(allResults) do
-        local rNameClean = r.name:gsub("%s*%(carpet%)%s*$", ""):gsub("%s*%(base%)%s*$", ""):lower()
-        local isRUltra = false
-        for _, u in ipairs(ULTRA_BRAINROTS) do
-            if u ~= "" and rNameClean == u:lower() then isRUltra = true; break end
+        local bestUltra = nil
+        for _, r in ipairs(results) do
+            local rNameClean = r.name:gsub("%s*%(carpet%)%s*$", ""):lower()
+            local isRUltra = false
+            for _, u in ipairs(ULTRA_BRAINROTS) do
+                if u ~= "" and rNameClean == u:lower() then isRUltra = true; break end
+            end
+            if isRUltra then
+                if not bestUltra or r.value > bestUltra.value then bestUltra = r end
+            end
         end
-        if isRUltra then
-            if not bestUltra or r.value > bestUltra.value then bestUltra = r end
-        end
-    end
 
-    table.sort(allResults, function(a, b) return a.value > b.value end)
-    local best = bestUltra or allResults[1]
+        table.sort(results, function(a, b) return a.value > b.value end)
+        local best = bestUltra or results[1]
 
         if best then
-        debugLog("RESULT: melhor=" .. tostring(best.name) .. "; value=" .. tostring(best.value) .. "; base=" .. tostring(best.isBase) .. "; carpet=" .. tostring(best.isCarpet))
-        -- Envia primeiro e só inicia o hop depois que as requisições terminarem.
-        -- O task.spawn anterior permitia que o teleporte interrompesse os webhooks.
-        --print("[WEBHOOK FLOW] Iniciando envio antes do hop")
-        sendToRailwayAPI(best.name, detectedJobId, best.gen, best.value, getUserKey(), best.ownerName, #Players:GetPlayers(), Players.MaxPlayers, PLACE_ID)
+            -- Railway primeiro (server.js recebe antes), Discord depois
+            task.spawn(function()
+                sendToRailwayAPI(best.name, detectedJobId, best.gen, best.value, getUserKey(), best.ownerName, #Players:GetPlayers(), Players.MaxPlayers, PLACE_ID)
 
-        local selectedUrl, selectedLabel
-        local isUltraName = false
-        local bestNameClean = best.name:gsub("%s*%(carpet%)%s*$", ""):gsub("%s*%(base%)%s*$", ""):lower()
-        for _, u in ipairs(ULTRA_BRAINROTS) do if u ~= "" and bestNameClean == u:lower() then isUltraName = true; break end end
+                sendWebhook(WEBHOOK_URL, best.name, best.value, best.mutation, results, true, "Bob Notify", best.ownerName, detectedJobId, true, best.inDuel)
 
-        if best.value >= 1e9 or isUltraName then
-            selectedUrl, selectedLabel = WEBHOOK_ULTRA, "ULTRA"
-        elseif best.value >= 100e6 then
-            selectedUrl, selectedLabel = WEBHOOK_HIGH, "HIGH"
-        else
-            selectedUrl, selectedLabel = WEBHOOK_MID, "MI"
+                local isUltraName = false
+                local bestNameClean = best.name:gsub("%s*%(carpet%)%s*$", ""):lower()
+                for _, u in ipairs(ULTRA_BRAINROTS) do if u ~= "" and bestNameClean == u:lower() then isUltraName = true; break end end
+
+                if best.value >= 1e9 or isUltraName then
+                    sendWebhook(WEBHOOK_ULTRA, best.name, best.value, best.mutation, results, false, "Ultra", best.ownerName, detectedJobId, false, best.inDuel)
+                elseif best.value >= 100e6 then
+                    sendWebhook(WEBHOOK_HIGH, best.name, best.value, best.mutation, results, false, "High", best.ownerName, detectedJobId, false, best.inDuel)
+                else
+                    sendWebhook(WEBHOOK_MID, best.name, best.value, best.mutation, results, false, "Mid", best.ownerName, detectedJobId, false, best.inDuel)
+                end
+            end)
+
+            print("✅ Sucesso:", best.name, "| Owner:", best.ownerName, "|", best.gen)
+            startInfiniteHop(best.name)
         end
-
-        --print(string.format("[WEBHOOK ROUTE] categoria=%s valor=%s urlConfigurada=%s urlFinal=%s", selectedLabel, tostring(best.value), tostring(selectedUrl and selectedUrl ~= ""), tostring(selectedUrl and selectedUrl:sub(1, 45) .. "..." or "nil")))
-        sendWebhook(selectedUrl, best.name, best.value, best.mutation, allResults, false, selectedLabel, best.ownerName, detectedJobId, false, best.inDuel)
-
-        --print(string.format("[WEBHOOK DEBUG] Melhor resultado: nome=%s valor=%s owner=%s isBase=%s isCarpet=%s totalResults=%d", tostring(best.name), tostring(best.value), tostring(best.ownerName), tostring(best.isBase), tostring(best.isCarpet), #allResults))
-        --print("[WEBHOOK DEBUG] Chamando webhook principal...")
-        --print("✅ Sucesso:", best.name, "| Owner:", best.ownerName, "|", best.gen)
-        task.wait(1)
-        --print("[WEBHOOK FLOW] Envio concluído; iniciando hop")
-        startInfiniteHop(best.name)
     end
 end
 
-if not found then
-    debugLog("RESULT: nenhum resultado; iniciando hop sem webhook de brainrot")
-    --print(string.format("[WEBHOOK DEBUG] Nenhum envio: allResults=%d; o bloco de webhook não foi executado", #allResults))
-    --print("❌ Nenhum brainrot valioso encontrado")
-    startInfiniteHop(nil)
-end
-
---print("🚀 Sistema de Hop Infinito ativado!")
+if not found then print("❌ Nenhum brainrot valioso encontrado"); startInfiniteHop("Scan") end
+print("🚀 Sistema de Hop Infinito ativado!")
