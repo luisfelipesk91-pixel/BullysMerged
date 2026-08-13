@@ -1159,7 +1159,7 @@ end
 local lastRailwayFetch = 0
 local railwayCachedServers = nil
 local RAILWAY_CACHE_TTL = 570  -- 9.5 min (server renova a cada 10 min)
-local MAX_SERVERS = 500  -- ✅ Pool de 500 servidores por rodada
+local MAX_SERVERS = 5000  -- ✅ Pool de 5000 servidores por rodada
 
 -- ════════════════════════════════════════════════════════════
 -- ANTI-COLISÃO: Locks compartilhados no Railway
@@ -1206,7 +1206,7 @@ local function fetchSharedLocks()
                 end
             end
             lastLocksFetch = now
-            debugLog("HOP: locks recebidos=" .. tostring(count))
+            print(string.format("[LOCK] 📋 %d locks ativos recebidos do Railway", count))
         end
     end
     return sharedLocks
@@ -1214,8 +1214,7 @@ end
 
 local function lockMyServer(serverId)
     local userId = (LocalPlayer and LocalPlayer.UserId or 0)
-    -- Lock fire-and-forget: se falhar, o hop continua (lock é otimista)
-    pcall(function()
+    local ok, resp = pcall(function()
         return http_request({
             Url  = RAILWAY_API .. "/api/locks",
             Method  = "POST",
@@ -1232,7 +1231,18 @@ local function lockMyServer(serverId)
             })
         })
     end)
-    -- Registra localmente na hora para não colidir nem com self
+    local status = 0
+    if ok and resp then
+        status = tonumber(resp.StatusCode or resp.Status or 0)
+        if status >= 200 and status < 300 then
+            print("[LOCK] ✅ servidor reservado serverId=" .. tostring(serverId):sub(1, 8) .. " status=" .. tostring(status))
+        else
+            print(string.format("[LOCK] ⚠️ Railway retornou %d para /api/locks — locks não implementados no backend", status))
+        end
+    else
+        print("[LOCK] ❌ request ao Railway falhou — " .. tostring(resp))
+    end
+    -- Registra localmente na hora (funciona mesmo se o Railway estiver fora)
     sharedLocks[tostring(serverId)] = { lockedBy = userId, lockedAt = os.time() }
 end
 
@@ -1503,10 +1513,10 @@ local function startInfiniteHop(label)
             debugLog("HOP: candidato bloqueado por já visitado/atual=" .. serverId)
             continue
         end
+        -- ✅ ANTI-COLISÃO: reserva o servidor no Railway ANTES de tudo
+        lockMyServer(serverId)
         curVisited[serverId] = os.time()
         saveVisitedServers(curVisited)
-        -- ✅ ANTI-COLISÃO: registra o servidor no Railway antes de teleportar
-        lockMyServer(serverId)
         local playing = tonumber(server.playing) or 0
         local maxPlayers = tonumber(server.maxPlayers) or 8
         text.Text = "📡 " .. label .. " → " .. string.sub(serverId, 1, 8)
