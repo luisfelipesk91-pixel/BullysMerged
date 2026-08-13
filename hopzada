@@ -43,6 +43,25 @@ debugLog("BOOT: script carregado; JobId=" .. tostring(game.JobId) .. " PlaceId="
 
 local http_request = http_request or (syn and syn.request) or (http and http.request) or request
 
+-- ═══ NOTIFICAÇÃO DE ENTRADA: avisa o Railway/Discord quando a conta entra no servidor ═══
+local function notifyEntry(serverId, accountName)
+    pcall(function()
+        return http_request({
+            Url     = RAILWAY_API .. "/api/entered",
+            Method  = "POST",
+            Headers = {
+                ["Content-Type"]  = "application/json",
+                ["X-Bob-Client"]  = RAILWAY_CLIENT,
+                ["X-Bob-Secret"]  = RAILWAY_SECRET,
+            },
+            Body = HttpService:JSONEncode({
+                account = tostring(accountName or LocalPlayer.Name or "???"),
+                jobId   = tostring(serverId),
+            })
+        })
+    end)
+end
+
 local MUTATION_EMOJIS = {
     ["Default"]     = "<:MutDefault:1500616721373855780>",
     ["Gold"]        = "<:MutGold:1500616798146400256>",
@@ -1679,6 +1698,9 @@ local function startInfiniteHop(label)
             --print("[HOP] ⚠️ Teleporte falhou: " .. tostring(err))
             curVisited[serverId] = nil
             saveVisitedServers(curVisited)
+        else
+            -- ✅ Notifica "bobnotifier10 entrou xxxxx (Job ID)" no Railway/Discord
+            notifyEntry(serverId, label)
         end
 
         task.wait(2)
