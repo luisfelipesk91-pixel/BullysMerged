@@ -1159,6 +1159,82 @@ end
 local lastRailwayFetch = 0
 local railwayCachedServers = nil
 local RAILWAY_CACHE_TTL = 570  -- 9.5 min (server renova a cada 10 min)
+local MAX_SERVERS = 500  -- ✅ Pool de 500 servidores por rodada
+
+-- ════════════════════════════════════════════════════════════
+-- ANTI-COLISÃO: Locks compartilhados no Railway
+-- Cada conta reserva o servidor que vai entrar (~60s de TTL).
+-- As demais contas removem servidores lockados por outros.
+-- ════════════════════════════════════════════════════════════
+local LOCK_TTL = 60  -- segundos que um lock permanece válido
+local lastLocksFetch = 0
+local sharedLocks = {}  -- { [serverId] = { lockedBy = UserId, lockedAt = os.time() } }
+
+local function fetchSharedLocks()
+    local now = os.time()
+    -- Cache os locks por 15s: evita flood de GETs entre instâncias
+    if (now - lastLocksFetch) < 15 then return sharedLocks end
+    local ok, resp = pcall(function()
+        return http_request({
+            Url  = RAILWAY_API .. "/api/locks?placeId=" .. tostring(PLACE_ID),
+            Method  = "GET",
+            Headers = {
+                ["Content-Type"]  = "application/json",
+                ["X-Bob-Client"]  = RAILWAY_CLIENT,
+                ["X-Bob-Secret"]  = RAILWAY_SECRET,
+            }
+        })
+    end)
+    if ok and resp and tonumber(resp.StatusCode or resp.Status or 0) == 200 then
+        local decoded, data = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(tostring(resp.Body or ""))
+        end)
+        if decoded and type(data) == "table" and type(data.locks) == "table" then
+            sharedLocks = {}
+            local count = 0
+            for _, lk in ipairs(data.locks) do
+                if type(lk) == "table" and lk.serverId then
+                    local lockedAt = tonumber(lk.lockedAt) or 0
+                    -- Descarta locks expirados (TTL)
+                    if (now - lockedAt) < LOCK_TTL then
+                        sharedLocks[tostring(lk.serverId)] = {
+                            lockedBy = lk.lockedBy or 0,
+                            lockedAt = lockedAt,
+                        }
+                        count = count + 1
+                    end
+                end
+            end
+            lastLocksFetch = now
+            debugLog("HOP: locks recebidos=" .. tostring(count))
+        end
+    end
+    return sharedLocks
+end
+
+local function lockMyServer(serverId)
+    local userId = (LocalPlayer and LocalPlayer.UserId or 0)
+    -- Lock fire-and-forget: se falhar, o hop continua (lock é otimista)
+    pcall(function()
+        return http_request({
+            Url  = RAILWAY_API .. "/api/locks",
+            Method  = "POST",
+            Headers = {
+                ["Content-Type"]  = "application/json",
+                ["X-Bob-Client"]  = RAILWAY_CLIENT,
+                ["X-Bob-Secret"]  = RAILWAY_SECRET,
+            },
+            Body = game:GetService("HttpService"):JSONEncode({
+                placeId  = tostring(PLACE_ID),
+                serverId = tostring(serverId),
+                lockedBy = userId,
+                ttl      = LOCK_TTL,
+            })
+        })
+    end)
+    -- Registra localmente na hora para não colidir nem com self
+    sharedLocks[tostring(serverId)] = { lockedBy = userId, lockedAt = os.time() }
+end
 
 -- ⚠️ FIX: normalizeServerList precisa estar ANTES de getServerList,
 -- pois `local function` não é hoistado em Luau.
@@ -1166,6 +1242,7 @@ local function normalizeServerList(servers)
     if type(servers) ~= "table" then return {} end
     local normalized, ids = {}, {}
     for _, server in ipairs(servers) do
+        if MAX_SERVERS and #normalized >= MAX_SERVERS then break end
         if type(server) == "table" and server.id then
             local id = tostring(server.id)
             if id ~= "" and not ids[id] then
@@ -1197,7 +1274,7 @@ local function getServerList(placeId)
     for attempt = 1, 4 do
         local ok, resp = pcall(function()
             return http_request({
-                Url  = RAILWAY_API .. "/api/servers/cache?placeId=" .. tostring(placeId),
+                Url  = RAILWAY_API .. "/api/servers/cache?placeId=" .. tostring(placeId) .. "&maxServers=" .. tostring(MAX_SERVERS),
                 Method  = "GET",
                 Headers = {
                     ["Content-Type"]  = "application/json",
@@ -1331,10 +1408,15 @@ local function startInfiniteHop(label)
         saveVisitedServers(curVisited)
 
         local scored = {}
+        local locks = fetchSharedLocks()  -- locks de TODAS as contas no Railway
+        local myUserId = (LocalPlayer and LocalPlayer.UserId or 0)
         for _, server in ipairs(allServers) do
             local serverId = tostring(server.id or "")
             if serverId == tostring(game.JobId) then continue end
             if visitedHas(curVisited, tostring(server.id or "")) then continue end
+            -- ✅ ANTI-COLISÃO: ignora servidores lockados por OUTRAS contas
+            local lk = locks[serverId]
+            if lk and lk.lockedBy ~= myUserId then continue end
             local score = scoreServer(server)
             if score > 0 then
                 table.insert(scored, { server = server, score = score })
@@ -1342,12 +1424,15 @@ local function startInfiniteHop(label)
         end
 
         -- Fallback: se todos estão cheios, tenta mesmo assim com os menos cheios
+        -- (ainda respeita os locks de outras contas para não esbarrar)
         if #scored == 0 and #allServers > 0 then
             --print("[HOP] Todos cheios — usando fallback (servidores menos lotados)")
             for _, server in ipairs(allServers) do
                 local serverId = tostring(server.id or "")
                         if serverId == tostring(game.JobId) then continue end
                 if visitedHas(curVisited, tostring(server.id or "")) then continue end
+                local lk = locks[serverId]
+                if lk and lk.lockedBy ~= myUserId then continue end
                 local playing = server.playing or 0
                 local score   = math.max(1, 20 - playing) + math.random(0, 10)
                 table.insert(scored, { server = server, score = score })
@@ -1420,6 +1505,8 @@ local function startInfiniteHop(label)
         end
         curVisited[serverId] = os.time()
         saveVisitedServers(curVisited)
+        -- ✅ ANTI-COLISÃO: registra o servidor no Railway antes de teleportar
+        lockMyServer(serverId)
         local playing = tonumber(server.playing) or 0
         local maxPlayers = tonumber(server.maxPlayers) or 8
         text.Text = "📡 " .. label .. " → " .. string.sub(serverId, 1, 8)
