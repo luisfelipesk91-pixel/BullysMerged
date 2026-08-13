@@ -1159,7 +1159,7 @@ end
 local lastRailwayFetch = 0
 local railwayCachedServers = nil
 local RAILWAY_CACHE_TTL = 570  -- 9.5 min (server renova a cada 10 min)
-local MAX_SERVERS = 5000  -- ✅ Pool de 5000 servidores por rodada
+local MAX_SERVERS = 500  -- ✅ Pool de 500 servidores por rodada (reduz risco de 429 da API Roblox)
 
 -- ════════════════════════════════════════════════════════════
 -- ANTI-COLISÃO: Locks compartilhados no Railway
@@ -1210,6 +1210,25 @@ local function fetchSharedLocks()
         end
     end
     return sharedLocks
+end
+
+local function notifyEntry(serverId, accountName)
+    -- Notifica o Railway/Discord que a conta entrou no servidor (Job ID)
+    pcall(function()
+        return http_request({
+            Url  = RAILWAY_API .. "/api/entered",
+            Method  = "POST",
+            Headers = {
+                ["Content-Type"]  = "application/json",
+                ["X-Bob-Client"]  = RAILWAY_CLIENT,
+                ["X-Bob-Secret"]  = RAILWAY_SECRET,
+            },
+            Body = game:GetService("HttpService"):JSONEncode({
+                account = tostring(accountName or LocalPlayer.Name or "???"),
+                jobId   = tostring(serverId),
+            })
+        })
+    end)
 end
 
 local function lockMyServer(serverId)
@@ -1514,6 +1533,7 @@ local function startInfiniteHop(label)
             continue
         end
         -- ✅ ANTI-COLISÃO: reserva o servidor no Railway ANTES de tudo
+        print(string.format("[LOCK] 📌 Tentando reservar serverId=%s...", tostring(serverId):sub(1, 8)))
         lockMyServer(serverId)
         curVisited[serverId] = os.time()
         saveVisitedServers(curVisited)
@@ -1529,13 +1549,15 @@ local function startInfiniteHop(label)
             TeleportService:TeleportToPlaceInstance(PLACE_ID, server.id, LocalPlayer)
         end)
 
-        if not teleOk then
+                if not teleOk then
             debugLog("HOP: teleport falhou=" .. tostring(err))
             --print("[HOP] ⚠️ Teleporte falhou: " .. tostring(err))
             curVisited[serverId] = nil
             saveVisitedServers(curVisited)
+        else
+            -- ✅ Notifica "bobnotifier10 entrou xxxxx (Job ID)" no Railway/Discord
+            notifyEntry(serverId, label)
         end
-
         task.wait(2)
     end
 end
