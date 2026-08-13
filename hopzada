@@ -1160,6 +1160,24 @@ local lastRailwayFetch = 0
 local railwayCachedServers = nil
 local RAILWAY_CACHE_TTL = 570  -- 9.5 min (server renova a cada 10 min)
 
+-- ⚠️ FIX: normalizeServerList precisa estar ANTES de getServerList,
+-- pois `local function` não é hoistado em Luau.
+local function normalizeServerList(servers)
+    if type(servers) ~= "table" then return {} end
+    local normalized, ids = {}, {}
+    for _, server in ipairs(servers) do
+        if type(server) == "table" and server.id then
+            local id = tostring(server.id)
+            if id ~= "" and not ids[id] then
+                ids[id] = true
+                server.id = id
+                table.insert(normalized, server)
+            end
+        end
+    end
+    return normalized
+end
+
 local function getServerList(placeId)
     local now = os.time()
 
