@@ -11,15 +11,20 @@ if not CoreGui or typeof(CoreGui) ~= "Instance" then
     CoreGui = game:GetService("CoreGui")
 end
 
+-- PRÉ-CARREGAMENTO DO SOM (MESMO DO JOINER)
+local BEEP_SOUND = Instance.new("Sound")
+BEEP_SOUND.Parent = CoreGui
+BEEP_SOUND.SoundId = "rbxassetid://101314628073587"
+BEEP_SOUND.Volume = 1
+BEEP_SOUND.PlayOnRemove = false
+pcall(function() BEEP_SOUND:Play(); BEEP_SOUND:Stop() end)
+
+local function playBeep()
+    pcall(function() BEEP_SOUND:Play() end)
+end
 
 if not game:IsLoaded() then game.Loaded:Wait() end
-
-task.wait(0.3)
-
--- Abre o console do Roblox automaticamente
-pcall(function()
-    game:GetService("StarterGui"):SetCore("DevConsoleVisible", true)
-end)
+task.wait(2)
 
 -- CONFIGURAÇÕES DE WEBHOOKS
 local WEBHOOK_URL   = "https://discord.com/api/webhooks/1524877771954978837/iF0UzBPKPI7-7nvAD84evgoLEg_wcVKaA0ruf_lqA0atbSRks0J9h4ZfivNfYmVG2O9r?with_components=true"
@@ -34,8 +39,8 @@ local RAILWAY_CLIENT = "Bobnotify"
 
 -- [LÓGICA DE SCAN E HOP CONTINUA ABAIXO...]
 local TARGET_NAMES   = {""}
-local ULTRA_BRAINROTS = {"Dragon Cannelloni", "Pineaplino", "Yess My Examen", "Caramello Filtrello", "Tob Tobi Tobi", "Bearito Cabinito", "Venuspino", "Festive 67", "Gorillo Subwoofero", "Cerberus", "Centrucci Nuclucci", "Rhino Helicopterino", "La Casa Boo", "Ganganzelli Trulala", "Strawberry Elephant", "Headless Horseman", "Skibidi Toilet", "Meowl", "Griffin", "Dragon Gingerini", "Hydra Dragon Cannelloni", "Ice Dragon", "Love Love Bear", "Digi Narwhal", "La Supreme Combinasion", "Hydra Bunny", "Bunny and Eggy", "Rosey and Teddy", "Cooki and Milki", "Arcadragon", "Ketupat Bros", "Reinito Sleghito", "Fortunu and Cashuru", "Los Amigos", "Pancake and Syrup", "Foxini Larternini", "Kalika Bros", "Los Sekolahs", "Signore Carapace", "Fragrama and Chocrama", "Cash or Card", "La Casa Boo", "La Food Combinasion", "Elefanto Frigo", "Spooky and Pumpky", "Boppin Bunny", "Ginger Gerat", "Los Chillis", "Sammyni Fattini", "Los Spaghettis", "Festive 67", "Quackini Snackini", "Antonio", "Hopilikalika Hopilikalako", "Fishino Clownino", "Jolly Jolly Sahur", "Tirilikaliko Tirilikalako", "Lovin Rose", "Fragola La La La", "Los Tacoritas", "Dragon Aquanini", "Tirilikalika Tirilikalako", "Jelly Moby", "Duggy Bros", "Sammyni Cakini", "Los Hackers", "Rubrikiko", "Rico Dinero", "Money Money Bros", "Dug Dug Dug", "Globa Steppa", "Caramelo Filtrello", "Gorilo Subwoofero", "Kraken", "Moby Bros", "Los Secret Combinasionas", "Pizza And Ranch", "Los Admins", "Rubiko And Kubiko", "Examen Bros", "Grabatron", "Capitano Americano", "Tenini Ballini"}
-local BLACK_NAMES    = {"Fishboard", "Chicleteira Bicicleteira", "Octoball", "Aquarino", "Lucky Block", "Los Taco Blocks", "To to to Sahur", "Graipuss Medussi", "Bunny Bunny Bunny Sahur", "Serafinna Medusella", "Chicleteirina Bicicleteirina", "Santa Hotspot", "Cupid Hotspot", "Los Quesadillas", "Naughty Naughty", "Flancito", "Capitano Gullini", "La Vacca Lepre Lepreino", "Quesadilla Crocodilla", "Easter Easter Easter Sahur", "Bombardiro Vaccariro", "Burrito Bandito", "Los Nooo My Hotspotsitos", "Los Sigmas", "Toro Españolo", "Ombrello Topolino", "Rocketini Frostini", "Sushi Inu", "Gelato Lumacho", "Pot Hotspot"}
+local ULTRA_BRAINROTS = {"Dragon Cannelloni", "Pineaplino", "Caramello Filtrello", "Avocadorilla", "Tob Tobi Tobi", "Bearito Cabinito", "Venuspino", "Festive 67", "Gorillo Subwoofero", "Cerberus", "Centrucci Nuclucci", "Rhino Helicopterino", "La Casa Boo", "Ganganzelli Trulala", "Strawberry Elephant", "Headless Horseman", "Skibidi Toilet", "Meowl", "Griffin", "Dragon Gingerini", "Hydra Dragon Cannelloni", "Ice Dragon", "Love Love Bear", "Digi Narwhal", "La Supreme Combinasion", "Hydra Bunny", "Bunny and Eggy", "Rosey and Teddy", "Cooki and Milki", "Arcadragon", "Ketupat Bros", "Reinito Sleghito", "Fortunu and Cashuru", "Los Amigos", "Pancake and Syrup", "Foxini Larternini", "Kalika Bros", "Los Sekolahs", "Signore Carapace", "Fragrama and Chocrama", "Cash or Card", "La Casa Boo", "La Food Combinasion", "Elefanto Frigo", "Spooky and Pumpky", "Boppin Bunny", "Ginger Gerat", "Los Chillis", "Sammyni Fattini", "Los Spaghettis", "Festive 67", "Quackini Snackini", "Antonio", "Hopilikalika Hopilikalako", "Fishino Clownino", "Jolly Jolly Sahur", "Tirilikaliko Tirilikalako", "Lovin Rose", "Fragola La La La", "Los Tacoritas", "Dragon Aquanini", "Tirilikalika Tirilikalako", "Jelly Moby", "Duggy Bros", "Sammyni Cakini", "Los Hackers", "Rubrikiko", "Rico Dinero", "Money Money Bros", "Dug Dug Dug", "Globa Steppa", "Caramelo Filtrello", "Gorilo Subwoofero", "Kraken"}
+local BLACK_NAMES    = {"Fishboard", "Chicleteira Bicicleteira", "Octoball", "Aquarino", "Lucky Block", "Los Taco Blocks", "To to to Sahur", "Graipuss Medussi", "Bunny Bunny Bunny Sahur", "Serafinna Medusella", "Chicleteirina Bicicleteirina", "Santa Hotspot", "Cupid Hotspot", "Los Quesadillas", "Naughty Naughty", "Flancito", "Capitano Gullini", "La Vacca Lepre Lepreino", "Quesadilla Crocodilla", "Easter Easter Easter Sahur", "Bombardiro Vaccariro", "Burrito Bandito", "Los Nooo My Hotspotsitos"}
 local MIN_VALUE        = 20000000
 local MIN_VALUE_CARPET = 20000000
 local NOTIFIER_NAME = "bob"
@@ -44,15 +49,7 @@ local PLACE_ID      = game.PlaceId
 local LocalPlayer = Players.LocalPlayer
 print("Players: " .. tostring(#Players:GetPlayers()))
 
--- Delta mobile: função pode estar em 'request', 'http_request', 'httprequest' ou 'fluxus_request'
-local http_request = (typeof(http_request)=="function" and http_request)
-    or (typeof(request)=="function" and request)
-    or (syn and typeof(syn.request)=="function" and syn.request)
-    or (http and typeof(http.request)=="function" and http.request)
-    or (typeof(httprequest)=="function" and httprequest)
-    or (typeof(fluxus_request)=="function" and fluxus_request)
-    or nil
-print("[INIT] http_request disponível: " .. tostring(http_request ~= nil))
+local http_request = http_request or (syn and syn.request) or (http and http.request) or request
 
 local MUTATION_EMOJIS = {
     ["Default"]     = "<:MutDefault:1500616721373855780>",
@@ -71,7 +68,6 @@ local MUTATION_EMOJIS = {
     ["Divine"]      = "<:MutDivine:1500618464312692756>",
     ["Cyber"]       = "<:MutCyber:1500618465680293910>",
     ["Phantom"]     = "<:MutPhantom:1518441817215864973>",
-    ["Crystal"]     = "<:MutCrystal:1531231876881059901>",
 }
 local function getMutEmoji(mutation)
     if not mutation or mutation == "" or mutation:lower() == "none" then
@@ -142,126 +138,111 @@ local TRAIT_EMOJIS = {
     ["Burger"]="<:Burger:1518450900413452380>",
 }
 
--- ════ SYNCHRONIZER (XenSync) ════
-do
-local _plotCache={}
-local _sync
-local _realCh
-local function _getSync()
-if _sync then return _sync end
-local ok,s=pcall(function()return require(game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("Synchronizer"))end)
-if ok then _sync=s end
-return _sync
-end
-local function _installHook()
-local sync=_getSync()
-if not sync or type(sync.GetAllChannels)~="function" then return end
-local orig=sync.GetAllChannels
-sync.GetAllChannels=function(...)
-local r=orig(...)
-if not _realCh and type(r)=="table" then _realCh=r end
-return r
-end
-end
-_installHook()
-_G.XenSyncAll=function()return _realCh or _plotCache end
-_G.XenSyncGet=function(idx)
-if idx==nil then return nil end
-if _realCh then
-local ch=rawget(_realCh,idx)
-if ch and type(ch)=="table" and type(ch.Get)=="function" then return ch end
-for k,v in pairs(_realCh)do if tostring(k)==idx and type(v)=="table" and type(v.Get)=="function" then return v end end
-end
-if _plotCache[idx]then return _plotCache[idx]end
-local sync=_getSync()
-if not sync or type(sync.GetTableFromChannel)~="function" then return nil end
-local ok,ct=pcall(sync.GetTableFromChannel,sync,idx)
-if ok and type(ct)=="table" then
-local proxy=setmetatable({},{
-__index=function(_,k)
-if k=="Get"then return function(_,f)return ct[f]end end
-if k=="GetTable"then return function()return ct end end
-return ct[k]
-end
-})
-_plotCache[idx]=proxy
-return proxy
-end
-return nil
-end
-_G._xenRawCT=function(plotName)
-local c=_G.XenSyncGet(plotName)
-if not c then return nil end
-if type(c.GetTable)=="function" then local ok,t=pcall(c.GetTable,c);if ok then return t end end
-return nil
-end
-local _AD,_MD,_TD
-local function _data()
-if _AD then return true end
-local ok=pcall(function()
-local d=game:GetService("ReplicatedStorage"):WaitForChild("Datas")
-_AD=require(d:WaitForChild("Animals"))
-_MD=require(d:WaitForChild("Mutations"))
-_TD=require(d:WaitForChild("Traits"))
-end)
-return ok and _AD~=nil
-end
-_G._xenGen=function(index,mutation,traits)
-if not _data() then return 0 end
-local info=_AD[index]
-if not info or not info.Generation then return 0 end
-local mult=1
-if mutation and mutation~="None" and mutation~="" then
-local m=_MD[mutation]
-if m and m.Modifier then mult=mult+m.Modifier end
-end
-if traits then
-if type(traits)=="string"and traits~="None"then
-for tr in traits:gmatch("[^, ]+")do
-local t=_TD[tr]
-if t and t.MultiplierModifier then mult=mult+t.MultiplierModifier end
-end
-elseif type(traits)=="table"then
-for _,tr in ipairs(traits)do
-local t=_TD[tr]
-if t and t.MultiplierModifier then mult=mult+t.MultiplierModifier end
-end
-end
-end
-return info.Generation*mult
-end
-_G._xenAnimShim=setmetatable({GetGeneration=function(_,index,mutation,traits)return _G._xenGen(index,mutation,traits)end},{
-__index=function(_,k)
-local ok,real=pcall(function()return require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Animals"))end)
-if ok and type(real)=="table" then return rawget(real,k) end
-return nil
-end})
-end
-_G.stealthGet=function(n) return _G.XenSyncGet(n) end
-_G.SyncInt={_cache={},_data=nil}
+-- ════ MULTIPLICADORES DE MUTAÇÃO ════
+local MUTATION_MULTIPLIERS = {
+    ["None"] = 1, [""] = 1, ["Default"] = 1,
+    ["Gold"] = 1.25,
+    ["Diamond"] = 1.5,
+    ["Blood Rot"] = 2, ["Bloodrot"] = 2,
+    ["Candy"] = 4,
+    ["Lava"] = 6,
+    ["Dreamy"] = 6,
+    ["Galaxy"] = 7,
+    ["Galaxy"] = 7,
+    ["Yin Yang"] = 7.5, ["YinYang"] = 7.5,
+    ["Radioactive"] = 8.5,
+    ["Cursed"] = 9,
+    ["Rainbow"] = 10, ["Divine"] = 10,
+    ["Cyber"] = 11, ["Disco"] = 11,
+    ["Phantom"] = 5,
+    ["Zombie"] = 5,
+}
 
-do
-    local cached
-    function _G.__getSync()
-        if cached then return cached end
-        local ok, mod = pcall(function()
-            local pkgs = ReplicatedStorage:FindFirstChild("Packages")
-            return pkgs and require(pkgs:WaitForChild("Synchronizer", 5))
-        end)
-        if ok then cached = mod end
-        return cached
+-- ════ MULTIPLICADORES DE TRAITS ════
+local TRAIT_MULTIPLIERS = {
+    -- Multiplicadores altos
+    ["Strawberry"] = 5, ["Meowl"] = 5, ["Skibidi"] = 5,
+    ["Rainbow Balloon"] = 6, ["RainbowBalloon"] = 6,
+    ["Pink Egg"] = 6, ["PinkEgg"] = 6,
+    ["John Pork"] = 4, ["JohnPork"] = 4,
+    -- Multiplicadores médios
+    ["Zombie"] = 2, ["Fireworks"] = 2, ["Fireworks"] = 2, ["Galactic"] = 2,
+    ["Disco"] = 1.5, ["Halo"] = 1.5, ["Paint"] = 1.5,
+    ["Chocolate"] = 1.5, ["Gingerbread Town"] = 1.5, ["GingerbreadTown"] = 1.5,
+    ["Claws"] = 1.5, ["Explosive"] = 2, ["Lightning"] = 1.5,
+    ["Jackolantern Pet"] = 1.5, ["JackOLanternPet"] = 1.5,
+    ["Skeleton"] = 1.5, ["Sleepy"] = 1.25, ["Reindeer Pet"] = 1.5, ["ReindeerPet"] = 1.5,
+    ["Sun"] = 2, ["Aura Shades"] = 1.5, ["AuraShades"] = 1.5,
+    ["Burger"] = 1.5, ["1 Year"] = 2, ["1Year"] = 2,
+    [":3"] = 1.1, ["ColonThree"] = 1.1,
+    ["Cometstruck"] = 1.5,
+    ["Bubblegum"] = 1.1, ["Brazil"] = 1.1, ["Indonesia"] = 1.1,
+    ["Blue Egg"] = 1.1, ["BlueEgg"] = 1.1,
+    ["Blue Balloon"] = 1.1, ["BlueBalloon"] = 1.1,
+    ["Bunny Ears"] = 1.1, ["BunnyEars"] = 1.1,
+    ["Fire"] = 1.25,
+    ["Glitched"] = 1.5,
+    ["Granny"] = 1.25,
+    ["Green Balloon"] = 1.1, ["GreenBalloon"] = 1.1,
+    ["Green Egg"] = 1.1, ["GreenEgg"] = 1.1,
+    ["Lucky"] = 10,
+    ["Matteo Hat"] = 1.25, ["MatteoHat"] = 1.25,
+    ["Nyan"] = 1.5,
+    ["Orange Balloon"] = 1.1, ["OrangeBalloon"] = 1.1,
+    ["Orange Egg"] = 1.1, ["OrangeEgg"] = 1.1,
+    ["Pink Balloon"] = 1.1, ["PinkBalloon"] = 1.1,
+    ["RIP Gravestone"] = 1.25, ["RIPGravestone"] = 1.25,
+    ["Red Balloon"] = 1.1, ["RedBalloon"] = 1.1,
+    ["Rose"] = 1.1,
+    ["Santa Hat"] = 1.25, ["SantaHat"] = 1.25,
+    ["Shark Fin"] = 1.5, ["SharkFin"] = 1.5,
+    ["Snowy"] = 1.1,
+    ["Sombrero"] = 1.25,
+    ["Spider"] = 1.5,
+    ["Taco"] = 1.5,
+    ["10B"] = 2, ["TenB"] = 2,
+    ["Tie"] = 1.25,
+    ["26"] = 1.5, ["TwentySix"] = 1.5,
+    ["UFO"] = 1.5,
+    ["Wet"] = 1.25,
+    ["Witch Hat"] = 1.5, ["WitchingHour"] = 1.5,
+    ["Claws"] = 1.5, ["crab_rave"] = 1.5,
+}
+
+-- ════ CÁLCULO DE GERAÇÃO COM MULTIPLICADORES ════
+local function calcGenWithMultipliers(baseGen, mutation, traitsList)
+    local mult = 1
+    -- Aplicar multiplicador de mutação
+    if mutation and MUTATION_MULTIPLIERS[mutation] then
+        mult = mult * MUTATION_MULTIPLIERS[mutation]
     end
+    -- Aplicar multiplicadores de traits
+    if traitsList and type(traitsList) == "table" then
+        for _, trait in ipairs(traitsList) do
+            if TRAIT_MULTIPLIERS[trait] then
+                mult = mult * TRAIT_MULTIPLIERS[trait]
+            end
+        end
+    end
+    return baseGen * mult
 end
 
--- Aliases locais para o restante do script
+local Synchronizer  = nil
 local AnimalsData   = nil
-local AnimalsShared = _G._xenAnimShim
+local AnimalsShared = nil
 do
-    local ok = pcall(function()
-        local d = RS:WaitForChild("Datas", 2)
-        AnimalsData = require(d:WaitForChild("Animals"))
-    end)
-    if not ok then AnimalsData = {} end
+    local function tryLoad(parent, name)
+        local ok, result = pcall(function()
+            return require(parent:WaitForChild(name, 5))
+        end)
+        return ok and result or nil
+    end
+    local ok_pkg, Packages = pcall(function() return RS:WaitForChild("Packages", 5) end)
+    local ok_dat, Datas    = pcall(function() return RS:WaitForChild("Datas", 5) end)
+    local ok_sh,  Shared   = pcall(function() return RS:WaitForChild("Shared", 5) end)
+    if ok_pkg and Packages then Synchronizer  = tryLoad(Packages, "Synchronizer") end
+    if ok_dat and Datas    then AnimalsData   = tryLoad(Datas,    "Animals")      end
+    if ok_sh  and Shared   then AnimalsShared = tryLoad(Shared,   "Animals")      end
 end
 
 local function parseValue(text)
@@ -410,8 +391,8 @@ local function scanPlots(duelPlayers, seen, currentJobId)
     if not plots then return results end
     
     for _, plot in ipairs(plots:GetChildren()) do
-        local pot = _G.XenSyncGet(plot.Name)
-        if not pot then continue end
+        local ok, pot = pcall(function() return Synchronizer:Get(plot.Name) end)
+        if not ok or not pot then continue end
         
         local ok2, list = pcall(function() return pot:Get("AnimalList") end)
         if not ok2 or type(list) ~= "table" then continue end
@@ -429,28 +410,9 @@ local function scanPlots(duelPlayers, seen, currentJobId)
         local plotHasQualifying = false
         local plotItems = {}
         
-        local animalCount = 0
-        for petIdOrData, animalData in pairs(list) do
-            animalCount = animalCount + 1
-            
-            -- Filtrar valores inválidos ANTES de processar
-            if type(animalData) == "string" and (animalData == "Empty" or animalData == "" or animalData == "nil") then
-                continue
-            end
-            
-            -- FIX UUID: Se animalData é string (UUID), buscar o pet
-            if type(animalData) == "string" then
-                local ok_pet, petData = pcall(function() return pot:Get(animalData) end)
-                if ok_pet and type(petData) == "table" then
-                    animalData = petData
-                else
-                    continue
-                end
-            end
-            
+        for _, animalData in pairs(list) do
             if type(animalData) ~= "table" then continue end
             if isFusing(animalData) then continue end
-            
             local name = animalData.Index
             if not name then continue end
             if not AnimalsData or not AnimalsData[name] then continue end
@@ -482,160 +444,18 @@ local function scanPlots(duelPlayers, seen, currentJobId)
                 if #traitsTable == 0 then traitsTable = nil end
             end
             
-            -- Calcular valor usando fórmula: (Base × Mutation) + Trait1 + Trait2 + ...
-            local genValue = nil
-            local baseGen = nil
-            
-            -- Método 1: _xenGen sem mutation/traits ($/s base)
-            local ok1, result1 = pcall(function() return _G._xenGen(name, nil, nil) end)
-            if ok1 and type(result1) == "number" and result1 > 0 then 
-                baseGen = result1
+            -- GetGeneration está broken (retorna nil/nil), usar Generation do AnimalsData + multiplicadores
+            local animalInfo = AnimalsData[name]
+            local baseGen = 0
+            if animalInfo and type(animalInfo) == "table" then
+                baseGen = animalInfo.Generation or 0
             end
+            if type(baseGen) ~= "number" or baseGen <= 0 then continue end
             
-            -- Fallback: Usar AnimalsData base
-            if not baseGen then
-                baseGen = AnimalsData[name].Generation
-                if not baseGen or type(baseGen) ~= "number" or baseGen <= 0 then
-                    continue
-                end
-            end
-            
-            -- FÓRMULA CORRETA: Base × (Mutation + (Trait1 + Trait2 + ...))
-            local mutationMod = 1
-            if mutation then
-                if mutation == "Gold" then mutationMod = 1.25
-                elseif mutation == "Diamond" then mutationMod = 1.5
-                elseif mutation == "Bloodrot" or mutation == "Blood Rot" then mutationMod = 2
-                elseif mutation == "Candy" then mutationMod = 4
-                elseif mutation == "Lava" then mutationMod = 6
-                elseif mutation == "Galaxy" then mutationMod = 7
-                elseif mutation == "YinYang" or mutation == "Yin Yang" then mutationMod = 7.5
-                elseif mutation == "Radioactive" then mutationMod = 8.5
-                elseif mutation == "Cursed" then mutationMod = 9
-                elseif mutation == "Rainbow" then mutationMod = 10
-                elseif mutation == "Divine" then mutationMod = 10
-                elseif mutation == "Cyber" then mutationMod = 11
-                elseif mutation == "Phantom" then mutationMod = 12
-                elseif mutation == "Crystal" then mutationMod = 13
-                end
-            end
-            
-            -- SOMAR todos os traits (exceto Sleepy)
-            local traitsSum = 0
-            if traitsTable and #traitsTable > 0 then
-                for _, trait in ipairs(traitsTable) do
-                    local traitMod = 0
-                    
-                    -- TRAITS OG
-                    if trait == "Strawberry" then traitMod = 8
-                    elseif trait == "Meowl" then traitMod = 7
-                    elseif trait == "John Pork" then traitMod = 6.5
-                    elseif trait == "Skibidi" then traitMod = 6
-                    
-                    -- TRAITS SEASONAL
-                    elseif trait == "Rainbow Balloon" then traitMod = 6.5
-                    elseif trait == "Pink Egg" then traitMod = 6.5
-                    elseif trait == "1 Year" then traitMod = 5.5
-                    elseif trait == "Pink Balloon" then traitMod = 5.5
-                    elseif trait == "Granny" then traitMod = 5.5
-                    elseif trait == "Reindeer Pet" then traitMod = 5
-                    elseif trait == "26" then traitMod = 5
-                    elseif trait == "Halo" then traitMod = 5
-                    elseif trait == "Lucky" then traitMod = 5
-                    elseif trait == "Red Balloon" then traitMod = 5
-                    elseif trait == "Blue Egg" then traitMod = 5
-                    elseif trait == "Sun" then traitMod = 5
-                    elseif trait == "Ball" then traitMod = 5
-                    elseif trait == "Bunny Ears" then traitMod = 4.5
-                    elseif trait == "Chocolate" then traitMod = 4.5
-                    elseif trait == "Jackolantern Pet" or trait == "Jack O'Lantern" then traitMod = 4.5
-                    elseif trait == "Blue Balloon" then traitMod = 4
-                    elseif trait == "Green Egg" then traitMod = 4
-                    elseif trait == "Santa Hat" then traitMod = 4
-                    elseif trait == "RIP Gravestone" or trait == "RIP Tombstone" then traitMod = 3.5
-                    elseif trait == "Green Balloon" then traitMod = 3.5
-                    elseif trait == "Orange Balloon" then traitMod = 3
-                    elseif trait == "Orange Egg" then traitMod = 3
-                    elseif trait == "Skeleton" then traitMod = 3
-                    elseif trait == "10B" then traitMod = 3
-                    elseif trait == "Witch Hat" then traitMod = 3
-                    
-                    -- TRAITS RITUALS
-                    elseif trait == "Paint" then traitMod = 5
-                    elseif trait == ":3" then traitMod = 4.5
-                    elseif trait == "Tie" then traitMod = 3.75
-                    elseif trait == "Spider" then traitMod = 3.5
-                    elseif trait == "Matteo Hat" then traitMod = 3.5
-                    elseif trait == "Galactic" then traitMod = 3
-                    elseif trait == "Explosive" then traitMod = 3
-                    elseif trait == "Shark Fin" then traitMod = 3
-                    
-                    -- TRAITS COUNTRY
-                    elseif trait == "Brazil" then traitMod = 5
-                    elseif trait == "Indonesia" then traitMod = 4
-                    elseif trait == "Sombrero" then traitMod = 4
-                    elseif trait == "Bull" then traitMod = 2
-                    
-                    -- TRAITS FIFA 2026 (todas 4.5x)
-                    elseif trait == "Algeria" or trait == "Argentina" or trait == "Australia" or trait == "Austria"
-                        or trait == "Belgium" or trait == "Bosnia and Herzegovina" or trait == "Canada" or trait == "Cape Verde"
-                        or trait == "Croatia" or trait == "Curacao" or trait == "Czechia" or trait == "DR Congo"
-                        or trait == "Ecuador" or trait == "Egypt" or trait == "England" or trait == "France"
-                        or trait == "Germany" or trait == "Ghana" or trait == "Haiti" or trait == "Iran"
-                        or trait == "Iraq" or trait == "Ivory Coast" or trait == "Japan" or trait == "Jordan"
-                        or trait == "Mexico" or trait == "Morocco" or trait == "Netherlands" or trait == "New Zealand"
-                        or trait == "Norway" or trait == "Panama" or trait == "Paraguay" or trait == "Portugal"
-                        or trait == "Qatar" or trait == "Saudi Arabia" or trait == "Scotland" or trait == "Senegal"
-                        or trait == "South Africa" or trait == "South Korea" or trait == "Spain" or trait == "Sweden"
-                        or trait == "Switzerland" or trait == "Tunisia" or trait == "Turkey" or trait == "United States"
-                        or trait == "Uruguay" or trait == "Uzbekistan" then traitMod = 4.5
-                    
-                    -- TRAITS ADMIN ABUSE
-                    elseif trait == "Fire" then traitMod = 5
-                    elseif trait == "Rose" then traitMod = 5
-                    elseif trait == "Fireworks" then traitMod = 5
-                    elseif trait == "Nyan" then traitMod = 5
-                    elseif trait == "Lightning" then traitMod = 5
-                    elseif trait == "Burger" then traitMod = 4.5
-                    elseif trait == "Aura Shades" then traitMod = 4.5
-                    elseif trait == "Disco" then traitMod = 4
-                    elseif trait == "Glitched" then traitMod = 4
-                    elseif trait == "Zombie" then traitMod = 4
-                    elseif trait == "Claws" or trait == "Crab Claw" then traitMod = 4
-                    elseif trait == "Bubblegum" then traitMod = 3
-                    elseif trait == "UFO" then traitMod = 2
-                    elseif trait == "Taco" then traitMod = 2
-                    
-                    -- TRAITS NATURAL EVENTS
-                    elseif trait == "Cometstruck" or trait == "Comet-struck" then traitMod = 2.5
-                    elseif trait == "Snowy" then traitMod = 2
-                    elseif trait == "Wet" then traitMod = 1.5
-                    
-                    -- Sleepy (não soma aqui, aplicado depois)
-                    elseif trait == "Sleepy" then traitMod = 0
-                    end
-                    
-                    traitsSum = traitsSum + traitMod
-                end
-            end
-            
-            -- CALCULAR: Base × (Mutation + TraitsSum)
-            genValue = baseGen * (mutationMod + traitsSum)
-            
-            -- Aplicar Sleepy por último (× 0.5)
-            if traitsTable then
-                for _, trait in ipairs(traitsTable) do
-                    if trait == "Sleepy" then
-                        genValue = genValue * 0.5
-                        break
-                    end
-                end
-            end
-            
-            if not genValue or genValue <= 0 then continue end
+            -- Aplicar multiplicadores de mutation e traits
+            local genValue = calcGenWithMultipliers(baseGen, mutation, traitsList)
             
             local qualifies = shouldScan(name, genValue)
-            
             if qualifies then plotHasQualifying = true end
             local displayName = name
             local info = AnimalsData[name]
@@ -668,12 +488,11 @@ end
 
 local function parseObjectText(objectText)
     if not objectText or objectText == "" then return nil, 0 end
-    local name, valStr = objectText:match("^(.-)%s*%$([%d%.]+[KkMmBbTt]?)%s*$")
-    if name and valStr then
-        name = name:match("^%s*(.-)%s*$")
-        return name, parseValue("$" .. valStr .. "/s")
-    end
-    return objectText:match("^%s*(.-)%s*$"), 0
+    -- Extrai APENAS o nome do animal, removendo o preço (tudo a partir do $)
+    -- Ex: "Svinina Bombardino $1.2K" -> "Svinina Bombardino"
+    local name = objectText:match("^(.-)%s*%$") or objectText:match("^%s*(.-)%s*$")
+    if name then name = name:match("^%s*(.-)%s*$") end
+    return name, 0
 end
 
 local function scanCarpet(seen, currentJobId)
@@ -681,30 +500,22 @@ local function scanCarpet(seen, currentJobId)
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if not obj:IsA("ProximityPrompt") or not obj.Enabled then continue end
         if (obj.ActionText or "") ~= "Purchase" then continue end
-        local displayName, genValue = parseObjectText(obj.ObjectText)
+        
+        local displayName = parseObjectText(obj.ObjectText)
         if not displayName or displayName == "" then continue end
         
-        -- Usar mesma lógica dos plots para pegar valor base correto
+        -- Pegar M/s do campo Generation do AnimalsData (GetGeneration está broken)
+        local genValue = 0
         if AnimalsData and AnimalsData[displayName] then
-            local baseGen = nil
-            
-            -- Método 1: GetGenerationNoTraits (retorna $/s base SEM mutation)
-            local ok1, result1 = pcall(function() return _G._xenGen(displayName, nil, nil) end)
-            if ok1 and type(result1) == "number" and result1 > 0 then 
-                baseGen = result1
-            end
-            
-            -- Fallback: Usar AnimalsData base
-            if not baseGen then
-                baseGen = AnimalsData[displayName].Generation
-            end
-            
-            if baseGen and type(baseGen) == "number" and baseGen > 0 then
-                genValue = baseGen
+            local animalInfo = AnimalsData[displayName]
+            if type(animalInfo) == "table" then
+                genValue = animalInfo.Generation or 0
             end
         end
+        
         if isBlacklisted(displayName) then continue end
         if not (genValue >= MIN_VALUE_CARPET or isTargeted(displayName) or isUltra(displayName)) then continue end
+        
         local genText = genValue > 0 and ("$" .. formatValue(genValue) .. "/s") or "?"
         table.insert(results, {
             tier = (genValue >= 1e9 or isUltra(displayName)) and "ULTRA" or (genValue >= 100e6) and "HIGH" or "MID",
@@ -839,63 +650,25 @@ local function sendToRailwayAPI(name, jobId, genText, value, key, ownerName, cur
     end)
 end
 
-local VISITED_EXPIRY = 300 -- 5 minutos
-math.randomseed(os.clock() * 1000000 + (LocalPlayer and LocalPlayer.UserId or 0))
-
--- Offset por conta: diversifica qual pool de servidores cada instância prioriza
--- Com 40+ contas, espalhamos em 8 buckets (era 4)
-local ACCOUNT_POOL_OFFSET = (LocalPlayer and LocalPlayer.UserId or 0) % 8
-
--- ════ VISITED SERVERS SYNC (compartilhado entre todas as contas via Railway) ════
--- Cada conta consulta e atualiza o mesmo cache na Railway,
--- evitando que múltiplas contas vão pro mesmo servidor.
-
-local _visitedCache = nil  -- cache local p/ não bater na API a cada leitura
+local VISITED_EXPIRY = 3600 -- 1 hora de memória
+math.randomseed(os.clock() * 1000000)
 
 local function getVisitedServers()
-    -- Tenta buscar da Railway (cache compartilhado entre todas as contas)
-    local ok, resp = pcall(function()
-        return http_request({
-            Url = RAILWAY_API .. "/api/visited",
-            Method = "GET",
-            Headers = { ["X-Bob-Secret"] = RAILWAY_SECRET, ["X-Bob-Client"] = RAILWAY_CLIENT }
-        })
-    end)
-    if ok and resp and resp.StatusCode == 200 then
-        local parsed, data = pcall(function() return HttpService:JSONDecode(resp.Body) end)
-        if parsed and type(data) == "table" then
-            _visitedCache = data
-            return data
+    local ok, content = pcall(function()
+        if isfile and isfile("visited_servers.json") then
+            return readfile("visited_servers.json")
         end
-    end
-    -- Fallback: usa cache local se Railway falhar
-    if _visitedCache then return _visitedCache end
-    local fok, content = pcall(function()
-        if isfile and isfile("visited_servers.json") then return readfile("visited_servers.json") end
         return "{}"
     end)
-    local sok, fdata = pcall(function() return HttpService:JSONDecode(fok and content or "{}") end)
-    return sok and fdata or {}
+    local success, data = pcall(function() return HttpService:JSONDecode(ok and content or "{}") end)
+    return success and data or {}
 end
 
 local function saveVisitedServers(data)
-    _visitedCache = data
-    -- Salva local (fallback)
     pcall(function()
-        if writefile then writefile("visited_servers.json", HttpService:JSONEncode(data)) end
-    end)
-    -- Sincroniza com Railway (compartilhado entre todas as contas)
-    pcall(function()
-        http_request({
-            Url = RAILWAY_API .. "/api/visited",
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json",
-                ["X-Bob-Secret"] = RAILWAY_SECRET,
-                ["X-Bob-Client"] = RAILWAY_CLIENT
-            },
-            Body = HttpService:JSONEncode(data)
-        })
+        if writefile then
+            writefile("visited_servers.json", HttpService:JSONEncode(data))
+        end
     end)
 end
 
@@ -912,353 +685,212 @@ text.TextColor3 = Color3.new(1, 1, 1)
 text.TextScaled = true
 text.Font = Enum.Font.SourceSansBold
 
--- Busca até 4 páginas alternando sortOrder — pool de ~400 servidores por rodada
--- O ACCOUNT_POOL_OFFSET faz cada conta começar numa ordem diferente,
--- então as 18 instâncias não disputam exatamente os mesmos servidores
-local function scoreServer(server)
-    local playing    = server.playing    or 0
-    local maxPlayers = server.maxPlayers
-    if not maxPlayers or maxPlayers <= 0 then maxPlayers = 12 end
-    -- Só entra em servidores com no máximo 6 jogadores
-    if playing > 6 then return -1 end
-    local score
-    if    playing <= 2 then score = 100
-    elseif playing <= 4 then score = 80
-    else                     score = 50  -- 5-6 players
-    end
-    return score + math.random(0, 35)
-end
+-- Cache local Railway (evita requests repetidos)
+local railwayCachedServers = nil
+local lastRailwayFetch = 0
+local RAILWAY_CACHE_TTL = 170 -- 2.8 min (server renova a cada 3 min)
 
--- ════ FILA GLOBAL DE API (coordena todas as contas via Railway) ════
--- Em vez de cada conta chamar a API diretamente, primeiro tenta buscar
--- uma lista cacheada no Railway. Só chama games.roblox.com se o cache
--- estiver velho ou vazio.
-local GLOBAL_CACHE_TTL = 180 -- segundos: reutiliza lista de servidores por 3 min entre todas as contas
-
-local function fetchServersFromRailwayCache()
-    local ok, resp = pcall(function()
-        return http_request({
-            Url = RAILWAY_API .. "/api/servers",
-            Method = "GET",
-            Headers = { ["X-Bob-Secret"] = RAILWAY_SECRET, ["X-Bob-Client"] = RAILWAY_CLIENT }
-        })
-    end)
-    if not ok or not resp or resp.StatusCode ~= 200 then return nil end
-    local parsed, data = pcall(function() return HttpService:JSONDecode(resp.Body) end)
-    if not parsed or type(data) ~= "table" then return nil end
-    -- data esperado: { servers = {...}, fetchedAt = timestamp }
-    if type(data.servers) ~= "table" or #data.servers == 0 then return nil end
-    local age = os.time() - (data.fetchedAt or 0)
-    if age > GLOBAL_CACHE_TTL then
-        print("[HOP] Cache Railway expirado (" .. age .. "s) — vai buscar novo")
-        return nil
-    end
-    print("[HOP] ✅ Usando cache Railway (" .. age .. "s atrás, " .. #data.servers .. " servidores)")
-    return data.servers
-end
-
-local function pushServersToRailwayCache(servers)
-    pcall(function()
-        http_request({
-            Url = RAILWAY_API .. "/api/servers",
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json",
-                ["X-Bob-Secret"] = RAILWAY_SECRET,
-                ["X-Bob-Client"] = RAILWAY_CLIENT
-            },
-            Body = HttpService:JSONEncode({ servers = servers, fetchedAt = os.time() })
-        })
-    end)
-end
-
--- Backoff global para 429: compartilhado entre chamadas desta instância
-local _rateBackoff = 0
-local _rateFailCount = 0
-
-local function fetchFromRobloxAPI(url)
-    -- Se ainda estamos em backoff, aguarda antes de tentar
-    if _rateBackoff > 0 then
-        local now = os.time()
-        if now < _rateBackoff then
-            local wait = _rateBackoff - now
-            warn("[HOP] ⏳ Backoff 429 ativo — aguardando " .. wait .. "s")
-            text.Text = "⏳ Rate limit — aguardando " .. wait .. "s"
-            task.wait(wait)
-        end
-        _rateBackoff = 0
+local function getServerList()
+    local now = os.time()
+    if railwayCachedServers and (now - lastRailwayFetch) < RAILWAY_CACHE_TTL then
+        return railwayCachedServers
     end
 
-    local body = nil
-    local statusCode = nil
+    local stagger = ((LocalPlayer and LocalPlayer.UserId or 0) % 30)
+    if stagger > 0 and lastRailwayFetch == 0 then task.wait(stagger * 0.4) end
 
-    if http_request then
+    local retryDelay = 5
+    for attempt = 1, 4 do
         local ok, resp = pcall(function()
             return http_request({
-                Url = url,
-                Method = "GET",
-                Headers = { ["User-Agent"] = "Roblox/WinInet", ["Accept"] = "application/json" }
+                Url     = RAILWAY_API .. "/api/servers/cache?placeId=" .. tostring(PLACE_ID),
+                Method  = "GET",
+                Headers = { ["Content-Type"]="application/json", ["X-Bob-Client"]=RAILWAY_CLIENT, ["X-Bob-Secret"]=RAILWAY_SECRET }
             })
         end)
         if ok and resp then
-            statusCode = resp.StatusCode or resp.statusCode
-            if statusCode == 200 then
-                body = resp.Body or resp.body
-                _rateFailCount = 0
-                print("[HOP] ✅ API OK (200)")
-            elseif statusCode == 429 then
-                _rateFailCount = _rateFailCount + 1
-                -- Backoff exponencial: 60s, 120s, 240s... máx 600s
-                local wait = math.min(60 * (2 ^ (_rateFailCount - 1)), 600)
-                _rateBackoff = os.time() + wait
-                warn("[HOP] ❌ 429 Rate Limit (tentativa " .. _rateFailCount .. ") — backoff " .. wait .. "s")
-                text.Text = "❌ 429 Rate Limit — backoff " .. wait .. "s"
-                -- NÃO tenta fallback: isso só piora o rate limit
-                return nil, 429
+            local status = tonumber(resp.StatusCode or resp.Status or 0)
+            if status == 200 then
+                local decoded, data = pcall(function() return HttpService:JSONDecode(tostring(resp.Body or "")) end)
+                if decoded and type(data)=="table" and type(data.servers)=="table" and #data.servers > 0 then
+                    railwayCachedServers = data.servers
+                    lastRailwayFetch = now
+                    print(string.format("[HOP] ✅ %d servidores do Railway", #data.servers))
+                    return railwayCachedServers
+                end
+            elseif status == 503 then
+                text.Text = "⏳ Railway buscando servidores (" .. retryDelay .. "s)..."
+                task.wait(retryDelay); retryDelay = math.min(retryDelay * 2, 30)
             else
-                local labels = {
-                    [403]="403 - Acesso Negado", [401]="401 - Não autorizado",
-                    [500]="500 - Erro Roblox", [503]="503 - Roblox fora do ar"
-                }
-                warn("[HOP] ❌ API: " .. (labels[statusCode] or tostring(statusCode)))
-                text.Text = "❌ API: " .. (labels[statusCode] or tostring(statusCode))
-                return nil, statusCode
+                task.wait(retryDelay); retryDelay = math.min(retryDelay * 2, 30)
             end
         else
-            warn("[HOP] ❌ http_request lançou erro: " .. tostring(resp))
+            task.wait(retryDelay); retryDelay = math.min(retryDelay * 2, 30)
         end
     end
-
-    -- Fallback game:HttpGet SOMENTE se http_request não existe (não como retry de 429)
-    if not body and not http_request then
-        local ok2, body2 = pcall(function() return game:HttpGet(url) end)
-        if ok2 and body2 and body2 ~= "" then
-            body = body2
-            print("[HOP] ✅ HttpGet fallback OK")
-        else
-            warn("[HOP] ❌ HttpGet falhou: " .. tostring(body2))
-        end
-    end
-
-    return body, statusCode
+    if railwayCachedServers and #railwayCachedServers > 0 then return railwayCachedServers end
+    return {}
 end
 
-local function fetchAllServers(placeId)
-    local allServers = {}
-    local seenIds    = {}
+-- Claim: reserva servidor no Railway antes de entrar
+local ACCOUNT_ID = tostring(LocalPlayer and LocalPlayer.UserId or math.random(100000, 999999))
 
-    -- 1) Tenta cache global do Railway primeiro (evita chamar Roblox desnecessariamente)
-    local cached = fetchServersFromRailwayCache()
-    if cached then return cached end
-
-    -- 2) Stagger: distribui as contas ao longo do tempo para não baterem juntas
-    -- Usa segundos do minuto atual + UserId para variar entre execuções do mesmo script
-    local baseOffset = (LocalPlayer.UserId % 40) * 4.0
-    local timeJitter  = (os.time() % 30)  -- jitter extra baseado no horário real
-    local stagger     = (baseOffset + timeJitter) % 120
-    if stagger > 0 then
-        print("[HOP] Stagger: aguardando " .. math.floor(stagger) .. "s antes de chamar API")
-        text.Text = "⏳ Aguardando slot (" .. math.floor(stagger) .. "s)..."
-        task.wait(stagger)
+local function claimServer(serverId)
+    local ok, resp = pcall(function()
+        return http_request({
+            Url    = RAILWAY_API .. "/api/servers/claim",
+            Method = "POST",
+            Headers = { ["Content-Type"]="application/json", ["X-Bob-Client"]=RAILWAY_CLIENT, ["X-Bob-Secret"]=RAILWAY_SECRET },
+            Body   = HttpService:JSONEncode({ serverId=serverId, accountId=ACCOUNT_ID })
+        })
+    end)
+    if not ok or not resp then return false end
+    local status = tonumber(resp.StatusCode or resp.Status or 0)
+    if status == 409 then
+        print("[HOP] ⚠️ Servidor já ocupado por outra conta — pulando")
+        return false
     end
+    return status == 200
+end
 
-    local sortOrder = ACCOUNT_POOL_OFFSET % 2 == 0 and "Asc" or "Desc"
+local function releaseServer(serverId)
+    pcall(function()
+        http_request({
+            Url    = RAILWAY_API .. "/api/servers/claim",
+            Method = "DELETE",
+            Headers = { ["Content-Type"]="application/json", ["X-Bob-Client"]=RAILWAY_CLIENT, ["X-Bob-Secret"]=RAILWAY_SECRET },
+            Body   = HttpService:JSONEncode({ serverId=serverId, accountId=ACCOUNT_ID })
+        })
+    end)
+end
 
-    local url = "https://games.roblox.com/v1/games/" .. placeId
-                .. "/servers/Public?sortOrder=" .. sortOrder .. "&limit=100"
-
-    local body, statusCode = fetchFromRobloxAPI(url)
-
-    if not body or body == "" then
-        return allServers  -- vazio; refillQueue vai tratar o backoff
-    end
-
-    local parsed, result = pcall(function() return HttpService:JSONDecode(body) end)
-    if not parsed then
-        warn("[HOP] JSON parse error")
-        return allServers
-    end
-
-    if result.errors then
-        local errMsg  = (result.errors[1] and result.errors[1].message) or "unknown"
-        local errCode = (result.errors[1] and result.errors[1].code) or statusCode or "?"
-        warn("[HOP] ❌ API erro: " .. tostring(errCode) .. " — " .. errMsg)
-        text.Text = "❌ API: " .. tostring(errCode) .. " — " .. errMsg
-        return allServers
-    end
-
-    if type(result) ~= "table" or not result.data then
-        warn("[HOP] Resposta inesperada (sem .data)")
-        return allServers
-    end
-
-    for _, server in ipairs(result.data) do
-        if not seenIds[server.id] then
-            seenIds[server.id] = true
-            table.insert(allServers, server)
+-- Detecta se outra conta Bob entrou no mesmo servidor e dá hop
+local function watchForBobAccounts()
+    task.spawn(function()
+        local bobPattern = "^bobnotifier%d+$"
+        while true do
+            task.wait(15)
+            local bobCount = 0
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Name:lower():match(bobPattern) then
+                    bobCount = bobCount + 1
+                end
+            end
+            if bobCount >= 1 then
+                print(string.format("[HOP] ⚠️ %d conta(s) Bob detectada(s) neste servidor — dando hop", bobCount))
+                releaseServer(tostring(game.JobId))
+                railwayCachedServers = nil
+                lastRailwayFetch = 0
+                -- Aguarda um delay aleatório para as contas não irem todas pro mesmo lugar
+                task.wait(math.random(1, 8))
+                local servers = getServerList()
+                if #servers > 0 then
+                    for _, s in ipairs(servers) do
+                        local id = tostring(s.id or "")
+                        if id ~= tostring(game.JobId) and claimServer(id) then
+                            print("[HOP] 🔄 Redirecionando para " .. id:sub(1,8))
+                            pcall(function()
+                                TeleportService:TeleportToPlaceInstance(PLACE_ID, s.id, LocalPlayer)
+                            end)
+                            task.wait(3)
+                            break
+                        end
+                    end
+                end
+            end
         end
-    end
-
-    -- 3) Salva no cache Railway para as outras contas aproveitarem
-    if #allServers > 0 then
-        pushServersToRailwayCache(allServers)
-        print("[HOP] ✅ Cache Railway atualizado (" .. #allServers .. " servidores)")
-    end
-
-    return allServers
+    end)
 end
 
 local function startInfiniteHop(label)
-    print("[HOP] Sistema iniciado...")
+    label = label or "Bob Notifier"
+    print("[HOP] Iniciando...")
     if not game:IsLoaded() then game.Loaded:Wait() end
-    task.wait(0.3)
+    task.wait(1)
+
+    -- Libera servidor atual ao iniciar (caso tenha claim de sessão anterior)
+    releaseServer(tostring(game.JobId))
 
     local visited = getVisitedServers()
-    visited[game.JobId] = os.time()
+    visited[tostring(game.JobId)] = os.time()
     saveVisitedServers(visited)
 
-    -- Fila local de candidatos: só chama a API quando esvaziar
-    local candidateQueue  = {}
-    local lastFetchTime   = 0
-    local apiFails        = 0
-    local MIN_FETCH_GAP   = 180  -- 3 min mínimo entre fetches por instância
-
-    local function refillQueue()
-        local now = os.time()
-        local gap = now - lastFetchTime
-        if gap < MIN_FETCH_GAP then
-            local wait = MIN_FETCH_GAP - gap
-            print("[HOP] Cooldown local: aguardando " .. wait .. "s")
-            text.Text = "⏳ Cooldown (" .. wait .. "s)..."
-            task.wait(wait)
-        end
-
-        text.Text = "🔍 Buscando servidores..."
-        lastFetchTime = os.time()
-
-        local allServers = fetchAllServers(PLACE_ID)
-        print("[HOP] Pool total: " .. #allServers .. " servidores")
-
-        if #allServers == 0 then
-            apiFails = apiFails + 1
-            -- Respeita backoff exponencial do 429 se estiver ativo
-            local now2 = os.time()
-            local extra = (_rateBackoff > now2) and (_rateBackoff - now2) or 0
-            local baseBackoff = math.min(apiFails * 30, 300)
-            local totalWait = math.max(baseBackoff, extra)
-            warn("[HOP] ❌ API falhou " .. apiFails .. "x — aguardando " .. totalWait .. "s")
-            text.Text = "❌ API falhou (" .. apiFails .. "x) — aguardando " .. totalWait .. "s"
-            task.wait(totalWait)
-            return false
-        end
-
-        apiFails = 0
-
-        -- Debug: mostra dados do primeiro servidor pra validar estrutura
-        if #allServers > 0 then
-            local s = allServers[1]
-            print("[HOP DEBUG] playing=" .. tostring(s.playing) .. " maxPlayers=" .. tostring(s.maxPlayers) .. " id=" .. tostring(s.id):sub(1, 8))
-        end
-
-        local curNow     = os.time()
-        local curVisited = getVisitedServers()
-        for id, ts in pairs(curVisited) do
-            if curNow - ts > VISITED_EXPIRY then curVisited[id] = nil end
-        end
-        saveVisitedServers(curVisited)
-
-        local scored = {}
-        for _, server in ipairs(allServers) do
-            if server.id == game.JobId  then continue end
-            if curVisited[server.id]    then continue end
-            local score = scoreServer(server)
-            if score > 0 then
-                table.insert(scored, { server = server, score = score })
-            end
-        end
-
-        -- Fallback: se todos estão cheios, tenta mesmo assim com os menos cheios
-        if #scored == 0 and #allServers > 0 then
-            print("[HOP] Todos cheios — usando fallback (servidores menos lotados)")
-            for _, server in ipairs(allServers) do
-                if server.id == game.JobId then continue end
-                if curVisited[server.id]   then continue end
-                local playing = server.playing or 0
-                local score   = math.max(1, 20 - playing) + math.random(0, 10)
-                table.insert(scored, { server = server, score = score })
-            end
-        end
-
-        table.sort(scored, function(a, b) return a.score > b.score end)
-
-        -- Pega o top 30 e embaralha entre eles: contas diferentes escolhem servidores diferentes
-        -- mesmo tendo a mesma lista base
-        local topN = math.min(30, #scored)
-        local topPool = {}
-        for i = 1, topN do table.insert(topPool, scored[i]) end
-        -- Fisher-Yates shuffle no top pool
-        for i = #topPool, 2, -1 do
-            local j = math.random(1, i)
-            topPool[i], topPool[j] = topPool[j], topPool[i]
-        end
-        -- Adiciona o restante no final (já ordenado)
-        for i = topN + 1, #scored do table.insert(topPool, scored[i]) end
-
-        candidateQueue = {}
-        for _, entry in ipairs(topPool) do
-            table.insert(candidateQueue, entry.server)
-        end
-
-        print("[HOP] Candidatos na fila: " .. #candidateQueue)
-        return #candidateQueue > 0
-    end
-
-    -- Preenche a fila na primeira vez
-    refillQueue()
+    -- Monitora contas Bob no mesmo servidor
+    watchForBobAccounts()
 
     while true do
-        -- Fila vazia: busca novos servidores
-        if #candidateQueue == 0 then
-            print("[HOP] Fila vazia — re-fetching...")
-            local hasNew = refillQueue()
-            if not hasNew then
-                -- Sem servidores novos: limpa metade do visited e tenta novamente
-                local curVisited = getVisitedServers()
-                local entries = {}
-                for id, ts in pairs(curVisited) do table.insert(entries, { id = id, ts = ts }) end
-                table.sort(entries, function(a, b) return a.ts < b.ts end)
-                local removeCount = math.max(1, math.floor(#entries * 0.5))
-                for i = 1, removeCount do curVisited[entries[i].id] = nil end
-                saveVisitedServers(curVisited)
-                print("[HOP] Cache parcial limpo (" .. removeCount .. " entradas).")
-                text.Text = "🔄 Cache limpo, aguardando..."
-                refillQueue()
-                continue
+        local servers = getServerList()
+        if #servers == 0 then
+            text.Text = "⏳ Aguardando servidores do Railway..."
+            task.wait(10)
+            continue
+        end
+
+        local now = os.time()
+        local currentVisited = getVisitedServers()
+        for id, ts in pairs(currentVisited) do
+            if now - ts > VISITED_EXPIRY then currentVisited[id] = nil end
+        end
+
+        local available = {}
+        for _, server in ipairs(servers) do
+            local id = tostring(server.id or "")
+            if id == "" or id == tostring(game.JobId) then continue end
+            if currentVisited[id] then continue end
+            local playing = server.playing or 0
+            local maxPlayers = server.maxPlayers or 8
+            -- Só entra em servidores com 5-8 jogadores (cheios mas com vaga)
+            if playing < 5 or playing >= maxPlayers then continue end
+            table.insert(available, server)
+        end
+
+        if #available == 0 then
+            railwayCachedServers = nil
+            lastRailwayFetch = 0
+            text.Text = "🔄 Sem servidores disponíveis — buscando novos..."
+            print("[HOP] Cache esgotado — forçando novo fetch")
+            task.wait(5)
+            continue
+        end
+
+        -- Embaralha aleatoriamente — cada conta vai pra um servidor diferente naturalmente
+        for i = #available, 2, -1 do
+            local j = math.random(1, i)
+            available[i], available[j] = available[j], available[i]
+        end
+
+        local chosen = nil
+        for _, s in ipairs(available) do
+            local id = tostring(s.id or "")
+            if claimServer(id) then
+                chosen = s
+                break
             end
         end
 
-        -- Pega o próximo da fila (top scored, com ruído já aplicado no scoreServer)
-        local chosen = table.remove(candidateQueue, 1)
-        if not chosen then continue end
+        if not chosen then
+            print("[HOP] ⚠️ Todos os servidores disponíveis já foram claimed — aguardando...")
+            text.Text = "⏳ Todos os servidores reservados — aguardando..."
+            task.wait(8)
+            continue
+        end
 
-        -- Marcar como visitado
-        local curVisited = getVisitedServers()
-        curVisited[chosen.id] = os.time()
-        saveVisitedServers(curVisited)
+        local id = tostring(chosen.id)
+        text.Text = string.format("📡 %s → %s... (%d/%d)", label, id:sub(1,8), chosen.playing or 0, chosen.maxPlayers or 8)
+        print(string.format("[HOP] → %s | Players: %d", id, chosen.playing or 0))
 
-        text.Text = "📡 " .. label .. " → " .. string.sub(chosen.id, 1, 8)
-                    .. "... (" .. chosen.playing .. "/" .. (chosen.maxPlayers or 8) .. ")"
-        print("[HOP] → " .. chosen.id .. " | Players: " .. chosen.playing
-              .. "/" .. (chosen.maxPlayers or 8) .. " | Fila restante: " .. #candidateQueue)
+        currentVisited[id] = os.time()
+        saveVisitedServers(currentVisited)
 
-        local teleOk, err = pcall(function()
+        local teleOk, teleErr = pcall(function()
             TeleportService:TeleportToPlaceInstance(PLACE_ID, chosen.id, LocalPlayer)
         end)
 
         if not teleOk then
-            print("[HOP] ⚠️ Teleporte falhou: " .. tostring(err))
-            curVisited[chosen.id] = nil
-            saveVisitedServers(curVisited)
+            print("[HOP] ⚠️ Teleporte falhou: " .. tostring(teleErr))
+            releaseServer(id)
+            currentVisited[id] = nil
+            saveVisitedServers(currentVisited)
         end
 
         task.wait(2)
@@ -1270,10 +902,11 @@ local function getUserKey()
     return (ok and key ~= "") and key or "Shadow"
 end
 
+task.wait(2)
 local detectedJobId = game.JobId
 local found = false
 
-if _G.XenSyncGet then
+if Synchronizer then
     local duelPlayers = getDuelPlayers()
     local seen = {}
     local results = scanPlots(duelPlayers, seen, detectedJobId)
@@ -1283,42 +916,46 @@ if _G.XenSyncGet then
 
     if type(results) == "table" and #results > 0 then
         found = true
-
+        
+        -- SISTEMA DE PRIORIDADE BOB (ULTRA > VALUE)
+        -- Primeiro, tentamos encontrar o melhor item ULTRA na lista
         local bestUltra = nil
         for _, r in ipairs(results) do
             local rNameClean = r.name:gsub("%s*%(carpet%)%s*$", ""):lower()
             local isRUltra = false
-            for _, u in ipairs(ULTRA_BRAINROTS) do
-                if u ~= "" and rNameClean == u:lower() then isRUltra = true; break end
+            for _, u in ipairs(ULTRA_BRAINROTS) do 
+                if u ~= "" and rNameClean == u:lower() then isRUltra = true; break end 
             end
+            
             if isRUltra then
-                if not bestUltra or r.value > bestUltra.value then bestUltra = r end
+                if not bestUltra or r.value > bestUltra.value then
+                    bestUltra = r
+                end
             end
         end
 
+        -- Ordena por valor para a lista "Other"
         table.sort(results, function(a, b) return a.value > b.value end)
+        
+        -- O destaque (best) será o melhor ULTRA, ou se não houver ultra, o de maior valor
         local best = bestUltra or results[1]
-
+        
         if best then
-            -- Railway primeiro (server.js recebe antes), Discord depois
-            task.spawn(function()
-                sendToRailwayAPI(best.name, detectedJobId, best.gen, best.value, getUserKey(), best.ownerName, #Players:GetPlayers(), Players.MaxPlayers, PLACE_ID)
-
-                sendWebhook(WEBHOOK_URL, best.name, best.value, best.mutation, results, true, "Bob Notify", best.ownerName, detectedJobId, true, best.inDuel)
-
-                local isUltraName = false
-                local bestNameClean = best.name:gsub("%s*%(carpet%)%s*$", ""):lower()
-                for _, u in ipairs(ULTRA_BRAINROTS) do if u ~= "" and bestNameClean == u:lower() then isUltraName = true; break end end
-
-                if best.value >= 1e9 or isUltraName then
-                    sendWebhook(WEBHOOK_ULTRA, best.name, best.value, best.mutation, results, false, "Ultra", best.ownerName, detectedJobId, false, best.inDuel)
-                elseif best.value >= 100e6 then
-                    sendWebhook(WEBHOOK_HIGH, best.name, best.value, best.mutation, results, false, "High", best.ownerName, detectedJobId, false, best.inDuel)
-                else
-                    sendWebhook(WEBHOOK_MID, best.name, best.value, best.mutation, results, false, "Mid", best.ownerName, detectedJobId, false, best.inDuel)
-                end
-            end)
-
+            sendWebhook(WEBHOOK_URL, best.name, best.value, best.mutation, results, true, "Bob Notify", best.ownerName, detectedJobId, true, best.inDuel)
+            
+            local isUltraName = false
+            local bestNameClean = best.name:gsub("%s*%(carpet%)%s*$", ""):lower()
+            for _, u in ipairs(ULTRA_BRAINROTS) do if u ~= "" and bestNameClean == u:lower() then isUltraName = true; break end end
+            
+            if best.value >= 1e9 or isUltraName then 
+                sendWebhook(WEBHOOK_ULTRA, best.name, best.value, best.mutation, results, false, "Ultra", best.ownerName, detectedJobId, false, best.inDuel)
+            elseif best.value >= 100e6 then 
+                sendWebhook(WEBHOOK_HIGH, best.name, best.value, best.mutation, results, false, "High", best.ownerName, detectedJobId, false, best.inDuel)
+            else 
+                sendWebhook(WEBHOOK_MID, best.name, best.value, best.mutation, results, false, "Mid", best.ownerName, detectedJobId, false, best.inDuel) 
+            end
+            
+            sendToRailwayAPI(best.name, detectedJobId, best.gen, best.value, getUserKey(), best.ownerName, #Players:GetPlayers(), Players.MaxPlayers, PLACE_ID)
             print("✅ Sucesso:", best.name, "| Owner:", best.ownerName, "|", best.gen)
             startInfiniteHop(best.name)
         end
