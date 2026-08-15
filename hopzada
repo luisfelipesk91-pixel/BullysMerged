@@ -1141,109 +1141,34 @@ text.TextColor3 = Color3.new(1, 1, 1)
 text.TextScaled = true
 text.Font = Enum.Font.SourceSansBold
 
--- KANYE HOPPER: substitui o cache/Railway hopper anterior.
--- Busca vários servidores públicos, evita o servidor atual e tenta novamente
--- quando a lista recebida estiver vazia ou os servidores estiverem cheios.
-local KANYE_HOP_DELAY = 5
-local KANYE_MAX_PAGES = 5
-local KANYE_MAX_RETRIES = 3
-local KANYE_RETRY_DELAY = 2
+-- SIMPLE PLACE-ID HOPPER
+-- O Roblox escolhe automaticamente um servidor público para esta PlaceId.
+local TARGET_PLACE_ID = 109983668079237
+local SIMPLE_HOP_DELAY = 5
+local SIMPLE_HOP_RETRY_DELAY = 8
 
-local function getKanyeAvailableServers(placeId)
-    local available = {}
-    local seen = {}
-    local cursor = ""
+local function simplePlaceHop(label)
+    label = tostring(label or "PlaceId Hopper")
+    local startingJobId = tostring(game.JobId)
 
-    for _ = 1, KANYE_MAX_PAGES do
-        local ok, response = pcall(function()
-            local url = "https://games.roblox.com/v1/games/"
-                .. tostring(placeId)
-                .. "/servers/Public?sortOrder=Asc&limit=100"
+    while tostring(game.JobId) == startingJobId do
+        text.Text = "🚀 " .. label .. ": entrando na PlaceId " .. tostring(TARGET_PLACE_ID) .. "..."
 
-            if cursor ~= "" then
-                url = url .. "&cursor=" .. HttpService:UrlEncode(cursor)
-            end
-
-            local body = game:HttpGet(url)
-            return HttpService:JSONDecode(body)
+        local ok, err = pcall(function()
+            TeleportService:Teleport(TARGET_PLACE_ID, LocalPlayer)
         end)
 
-        if not ok or type(response) ~= "table" then
-            break
-        end
-
-        if type(response.data) == "table" then
-            for _, server in ipairs(response.data) do
-                if type(server) == "table" and server.id then
-                    local id = tostring(server.id)
-                    local playing = tonumber(server.playing) or 0
-                    local maxPlayers = tonumber(server.maxPlayers) or 0
-
-                    if id ~= tostring(game.JobId)
-                        and not seen[id]
-                        and maxPlayers > 0
-                        and playing < maxPlayers then
-                        seen[id] = true
-                        table.insert(available, server)
-                    end
-                end
-            end
-        end
-
-        cursor = tostring(response.nextPageCursor or "")
-        if cursor == "" then
-            break
-        end
-    end
-
-    return available
-end
-
-local function kanyeHop(label)
-    label = tostring(label or "Kanye Hopper")
-    local currentJobId = tostring(game.JobId)
-
-    -- Continua indefinidamente até o Roblox aceitar uma troca de servidor.
-    while tostring(game.JobId) == currentJobId do
-        text.Text = "🔍 " .. label .. ": procurando servidor..."
-
-        local candidates = {}
-        for attempt = 1, KANYE_MAX_RETRIES do
-            candidates = getKanyeAvailableServers(PLACE_ID)
-            if #candidates > 0 then
-                break
-            end
-
-            text.Text = "⏳ Nenhum servidor livre; tentando novamente..."
-            task.wait(KANYE_RETRY_DELAY)
-        end
-
-        if #candidates == 0 then
-            text.Text = "⚠️ Nenhum servidor encontrado; continuando..."
-            task.wait(KANYE_RETRY_DELAY)
+        if not ok then
+            debugLog("PlaceId Hopper: teleporte falhou: " .. tostring(err))
+            text.Text = "⚠️ Falha no teleporte; tentando novamente..."
+            task.wait(SIMPLE_HOP_RETRY_DELAY)
         else
-            local selected = candidates[math.random(1, #candidates)]
-            local serverId = tostring(selected.id)
-            local playing = tonumber(selected.playing) or 0
-            local maxPlayers = tonumber(selected.maxPlayers) or 0
-            text.Text = string.format("🚀 Tentando servidor (%d/%d)...", playing, maxPlayers)
-
-            local ok, err = pcall(function()
-                TeleportService:TeleportToPlaceInstance(PLACE_ID, serverId, LocalPlayer)
-            end)
-
-            if not ok then
-                debugLog("Kanye Hopper: teleporte falhou: " .. tostring(err))
-                text.Text = "⚠️ Teleporte falhou; procurando outro..."
-                task.wait(KANYE_RETRY_DELAY)
-            else
-                -- Se a troca não ocorrer, a rotina volta a procurar outro servidor.
-                task.wait(8)
-                if tostring(game.JobId) ~= currentJobId then
-                    return true
-                end
-                text.Text = "⚠️ Teleporte não concluiu; tentando novamente..."
-                task.wait(KANYE_RETRY_DELAY)
+            -- Teleport() pode retornar sem concluir imediatamente.
+            -- Se continuar no mesmo JobId, tenta novamente.
+            task.wait(SIMPLE_HOP_RETRY_DELAY)
+            if tostring(game.JobId) == startingJobId then
+                text.Text = "⏳ Ainda no servidor atual; tentando novamente..."
+                task.wait(SIMPLE_HOP_RETRY_DELAY)
             end
         end
     end
@@ -1252,14 +1177,12 @@ local function kanyeHop(label)
 end
 
 local function startInfiniteHop(label)
-    label = tostring(label or "Kanye Hopper")
-
     if not game:IsLoaded() then
         game.Loaded:Wait()
     end
 
-    task.wait(KANYE_HOP_DELAY)
-    kanyeHop(label)
+    task.wait(SIMPLE_HOP_DELAY)
+    simplePlaceHop(label)
 end
 
 local function getUserKey()
