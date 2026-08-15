@@ -931,174 +931,83 @@ end
 
 -- ════ FILA GLOBAL DE API (coordena todas as contas via Railway) ════
 -- Em vez de cada conta chamar a API diretamente, primeiro tenta buscar
--- uma lista cacheada no Railway. Só chama games.roblox.com se o cache
+-- uma lista cacheada no Railway — instâncias nunca chamam a API do Roblox diretamente
 -- estiver velho ou vazio.
 local GLOBAL_CACHE_TTL = 180 -- segundos: reutiliza lista de servidores por 3 min entre todas as contas
 
-local function fetchServersFromRailwayCache()
-    local ok, resp = pcall(function()
-        return http_request({
-            Url = RAILWAY_API .. "/api/servers",
-            Method = "GET",
-            Headers = { ["X-Bob-Secret"] = RAILWAY_SECRET, ["X-Bob-Client"] = RAILWAY_CLIENT }
-        })
-    end)
-    if not ok or not resp or resp.StatusCode ~= 200 then return nil end
-    local parsed, data = pcall(function() return HttpService:JSONDecode(resp.Body) end)
-    if not parsed or type(data) ~= "table" then return nil end
-    -- data esperado: { servers = {...}, fetchedAt = timestamp }
-    if type(data.servers) ~= "table" or #data.servers == 0 then return nil end
-    local age = os.time() - (data.fetchedAt or 0)
-    if age > GLOBAL_CACHE_TTL then
-        print("[HOP] Cache Railway expirado (" .. age .. "s) — vai buscar novo")
-        return nil
-    end
-    print("[HOP] ✅ Usando cache Railway (" .. age .. "s atrás, " .. #data.servers .. " servidores)")
-    return data.servers
-end
+-- Cache local por instância (evita requests repetidos ao Railway)
+local _localServerCache = nil
+local _localCacheTime   = 0
+local LOCAL_CACHE_TTL   = 170  -- 2.8 min (Railway renova a cada 3 min)
 
-local function pushServersToRailwayCache(servers)
-    pcall(function()
-        http_request({
-            Url = RAILWAY_API .. "/api/servers",
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json",
-                ["X-Bob-Secret"] = RAILWAY_SECRET,
-                ["X-Bob-Client"] = RAILWAY_CLIENT
-            },
-            Body = HttpService:JSONEncode({ servers = servers, fetchedAt = os.time() })
-        })
-    end)
-end
-
--- Backoff global para 429: compartilhado entre chamadas desta instância
-local _rateBackoff = 0
-local _rateFailCount = 0
-
-local function fetchFromRobloxAPI(url)
-    -- Se ainda estamos em backoff, aguarda antes de tentar
-    if _rateBackoff > 0 then
-        local now = os.time()
-        if now < _rateBackoff then
-            local wait = _rateBackoff - now
-            warn("[HOP] ⏳ Backoff 429 ativo — aguardando " .. wait .. "s")
-            text.Text = "⏳ Rate limit — aguardando " .. wait .. "s"
-            task.wait(wait)
-        end
-        _rateBackoff = 0
-    end
-
-    local body = nil
-    local statusCode = nil
-
-    if http_request then
-        local ok, resp = pcall(function()
-            return http_request({
-                Url = url,
-                Method = "GET",
-                Headers = { ["User-Agent"] = "Roblox/WinInet", ["Accept"] = "application/json" }
-            })
-        end)
-        if ok and resp then
-            statusCode = resp.StatusCode or resp.statusCode
-            if statusCode == 200 then
-                body = resp.Body or resp.body
-                _rateFailCount = 0
-                print("[HOP] ✅ API OK (200)")
-            elseif statusCode == 429 then
-                _rateFailCount = _rateFailCount + 1
-                -- Backoff exponencial: 60s, 120s, 240s... máx 600s
-                local wait = math.min(60 * (2 ^ (_rateFailCount - 1)), 600)
-                _rateBackoff = os.time() + wait
-                warn("[HOP] ❌ 429 Rate Limit (tentativa " .. _rateFailCount .. ") — backoff " .. wait .. "s")
-                text.Text = "❌ 429 Rate Limit — backoff " .. wait .. "s"
-                -- NÃO tenta fallback: isso só piora o rate limit
-                return nil, 429
-            else
-                local labels = {
-                    [403]="403 - Acesso Negado", [401]="401 - Não autorizado",
-                    [500]="500 - Erro Roblox", [503]="503 - Roblox fora do ar"
-                }
-                warn("[HOP] ❌ API: " .. (labels[statusCode] or tostring(statusCode)))
-                text.Text = "❌ API: " .. (labels[statusCode] or tostring(statusCode))
-                return nil, statusCode
-            end
-        else
-            warn("[HOP] ❌ http_request lançou erro: " .. tostring(resp))
-        end
-    end
-
-    -- Fallback game:HttpGet SOMENTE se http_request não existe (não como retry de 429)
-    if not body and not http_request then
-        local ok2, body2 = pcall(function() return game:HttpGet(url) end)
-        if ok2 and body2 and body2 ~= "" then
-            body = body2
-            print("[HOP] ✅ HttpGet fallback OK")
-        else
-            warn("[HOP] ❌ HttpGet falhou: " .. tostring(body2))
-        end
-    end
-
-    return body, statusCode
-end
-
+-- Railway busca da API Roblox server-side — instâncias NUNCA tocam na API do Roblox
 local function fetchAllServers(placeId)
-    local allServers = {}
-    local seenIds    = {}
+    local now = os.time()
 
-    -- 1) Tenta cache global do Railway primeiro (evita chamar Roblox desnecessariamente)
-    local cached = fetchServersFromRailwayCache()
-    if cached then return cached end
+    -- Cache local válido
+    if _localServerCache and (now - _localCacheTime) < LOCAL_CACHE_TTL then
+        print("[HOP] ✅ Cache local válido (" .. #_localServerCache .. " servidores)")
+        return _localServerCache
+    end
 
-    -- 2) Stagger leve: máximo 10s para não tomar kick por AFK
-    local stagger = (LocalPlayer.UserId % 8) + math.random(1, 3)
+    -- Stagger leve por conta: evita 60 requests simultâneos ao Railway
+    local stagger = (LocalPlayer.UserId % 10) + math.random(1, 3)
     task.wait(stagger)
 
-    local sortOrder = ACCOUNT_POOL_OFFSET % 2 == 0 and "Asc" or "Desc"
+    local retryDelay = 5
+    for attempt = 1, 4 do
+        local ok, resp = pcall(function()
+            return http_request({
+                Url     = RAILWAY_API .. "/api/servers/cache?placeId=" .. tostring(placeId),
+                Method  = "GET",
+                Headers = {
+                    ["Content-Type"] = "application/json",
+                    ["X-Bob-Client"] = RAILWAY_CLIENT,
+                    ["X-Bob-Secret"] = RAILWAY_SECRET,
+                }
+            })
+        end)
 
-    local url = "https://games.roblox.com/v1/games/" .. placeId
-                .. "/servers/Public?sortOrder=" .. sortOrder .. "&limit=100"
+        if ok and resp then
+            local status = tonumber(resp.StatusCode or resp.Status or 0)
 
-    local body, statusCode = fetchFromRobloxAPI(url)
+            if status == 200 then
+                local decoded, data = pcall(function()
+                    return HttpService:JSONDecode(tostring(resp.Body or ""))
+                end)
+                if decoded and type(data) == "table" and type(data.servers) == "table" and #data.servers > 0 then
+                    _localServerCache = data.servers
+                    _localCacheTime   = now
+                    print(string.format("[HOP] ✅ %d servidores do Railway (tentativa %d)", #data.servers, attempt))
+                    return _localServerCache
+                end
 
-    if not body or body == "" then
-        return allServers  -- vazio; refillQueue vai tratar o backoff
-    end
-
-    local parsed, result = pcall(function() return HttpService:JSONDecode(body) end)
-    if not parsed then
-        warn("[HOP] JSON parse error")
-        return allServers
-    end
-
-    if result.errors then
-        local errMsg  = (result.errors[1] and result.errors[1].message) or "unknown"
-        local errCode = (result.errors[1] and result.errors[1].code) or statusCode or "?"
-        warn("[HOP] ❌ API erro: " .. tostring(errCode) .. " — " .. errMsg)
-        text.Text = "❌ API: " .. tostring(errCode) .. " — " .. errMsg
-        return allServers
-    end
-
-    if type(result) ~= "table" or not result.data then
-        warn("[HOP] Resposta inesperada (sem .data)")
-        return allServers
-    end
-
-    for _, server in ipairs(result.data) do
-        if not seenIds[server.id] then
-            seenIds[server.id] = true
-            table.insert(allServers, server)
+            elseif status == 503 then
+                -- Railway ainda buscando da API Roblox — aguarda e tenta de novo
+                text.Text = "⏳ Railway buscando servidores (" .. retryDelay .. "s)..."
+                print(string.format("[HOP] ⏳ Railway buscando... tentativa %d/4 (%ds)", attempt, retryDelay))
+                task.wait(retryDelay)
+                retryDelay = math.min(retryDelay * 2, 30)
+            else
+                print(string.format("[HOP] ⚠️ Railway retornou %d (tentativa %d)", status, attempt))
+                task.wait(retryDelay)
+                retryDelay = math.min(retryDelay * 2, 30)
+            end
+        else
+            print(string.format("[HOP] ⚠️ Request falhou (tentativa %d): %s", attempt, tostring(resp)))
+            task.wait(retryDelay)
+            retryDelay = math.min(retryDelay * 2, 30)
         end
     end
 
-    -- 3) Salva no cache Railway para as outras contas aproveitarem
-    if #allServers > 0 then
-        pushServersToRailwayCache(allServers)
-        print("[HOP] ✅ Cache Railway atualizado (" .. #allServers .. " servidores)")
+    -- Cache vencido ainda é melhor que nada
+    if _localServerCache and #_localServerCache > 0 then
+        print("[HOP] ⚠️ Usando cache local vencido como fallback")
+        return _localServerCache
     end
 
-    return allServers
+    print("[HOP] ❌ Sem servidores disponíveis")
+    return {}
 end
 
 local function startInfiniteHop(label)
@@ -1134,13 +1043,9 @@ local function startInfiniteHop(label)
 
         if #allServers == 0 then
             apiFails = apiFails + 1
-            -- Respeita backoff exponencial do 429 se estiver ativo
-            local now2 = os.time()
-            local extra = (_rateBackoff > now2) and (_rateBackoff - now2) or 0
-            local baseBackoff = math.min(apiFails * 30, 300)
-            local totalWait = math.max(baseBackoff, extra)
-            warn("[HOP] ❌ API falhou " .. apiFails .. "x — aguardando " .. totalWait .. "s")
-            text.Text = "❌ API falhou (" .. apiFails .. "x) — aguardando " .. totalWait .. "s"
+            local totalWait = math.min(apiFails * 15, 120)
+            warn("[HOP] ❌ Railway sem servidores (" .. apiFails .. "x) — aguardando " .. totalWait .. "s")
+            text.Text = "⏳ Aguardando servidores do Railway (" .. totalWait .. "s)..."
             task.wait(totalWait)
             return false
         end
