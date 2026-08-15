@@ -806,7 +806,15 @@ local function startInfiniteHop(label)
     label = label or "Bob Notifier"
     print("[HOP] Iniciando...")
     if not game:IsLoaded() then game.Loaded:Wait() end
-    task.wait(1)
+
+    -- Stagger de boot: cada conta espera um tempo diferente antes de começar a hopar
+    -- Evita 60 contas teleportando ao mesmo tempo do mesmo IP
+    local bootDelay = (LocalPlayer.UserId % 60) * 2  -- 0 a 120 segundos
+    if bootDelay > 0 then
+        print(string.format("[HOP] Boot delay: %ds (anti-abuse)", bootDelay))
+        text.Text = string.format("⏳ Aguardando boot delay (%ds)...", bootDelay)
+        task.wait(bootDelay)
+    end
 
     -- Libera servidor atual ao iniciar (caso tenha claim de sessão anterior)
     releaseServer(tostring(game.JobId))
@@ -882,6 +890,11 @@ local function startInfiniteHop(label)
         currentVisited[id] = os.time()
         saveVisitedServers(currentVisited)
 
+        -- Delay aleatório antes de teleportar (anti-abuse)
+        local preDelay = math.random(3, 10)
+        text.Text = string.format("⏳ Aguardando %ds antes de teleportar...", preDelay)
+        task.wait(preDelay)
+
         local teleOk, teleErr = pcall(function()
             TeleportService:TeleportToPlaceInstance(PLACE_ID, chosen.id, LocalPlayer)
         end)
@@ -893,7 +906,7 @@ local function startInfiniteHop(label)
             saveVisitedServers(currentVisited)
         end
 
-        task.wait(2)
+        task.wait(math.random(6, 12))
     end
 end
 
