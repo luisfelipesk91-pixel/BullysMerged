@@ -129,22 +129,126 @@ local TRAIT_EMOJIS = {
     ["Burger"]="<:Burger:1518450900413452380>",
 }
 
-local Synchronizer  = nil
-local AnimalsData   = nil
-local AnimalsShared = nil
+-- ════ SYNCHRONIZER (XenSync) ════
 do
-    local function tryLoad(parent, name)
-        local ok, result = pcall(function()
-            return require(parent:WaitForChild(name, 2))
+local _plotCache={}
+local _sync
+local _realCh
+local function _getSync()
+if _sync then return _sync end
+local ok,s=pcall(function()return require(game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("Synchronizer"))end)
+if ok then _sync=s end
+return _sync
+end
+local function _installHook()
+local sync=_getSync()
+if not sync or type(sync.GetAllChannels)~="function" then return end
+local orig=sync.GetAllChannels
+sync.GetAllChannels=function(...)
+local r=orig(...)
+if not _realCh and type(r)=="table" then _realCh=r end
+return r
+end
+end
+_installHook()
+_G.XenSyncAll=function()return _realCh or _plotCache end
+_G.XenSyncGet=function(idx)
+if idx==nil then return nil end
+if _realCh then
+local ch=rawget(_realCh,idx)
+if ch and type(ch)=="table" and type(ch.Get)=="function" then return ch end
+for k,v in pairs(_realCh)do if tostring(k)==idx and type(v)=="table" and type(v.Get)=="function" then return v end end
+end
+if _plotCache[idx]then return _plotCache[idx]end
+local sync=_getSync()
+if not sync or type(sync.GetTableFromChannel)~="function" then return nil end
+local ok,ct=pcall(sync.GetTableFromChannel,sync,idx)
+if ok and type(ct)=="table" then
+local proxy=setmetatable({},{
+__index=function(_,k)
+if k=="Get"then return function(_,f)return ct[f]end end
+if k=="GetTable"then return function()return ct end end
+return ct[k]
+end
+})
+_plotCache[idx]=proxy
+return proxy
+end
+return nil
+end
+_G._xenRawCT=function(plotName)
+local c=_G.XenSyncGet(plotName)
+if not c then return nil end
+if type(c.GetTable)=="function" then local ok,t=pcall(c.GetTable,c);if ok then return t end end
+return nil
+end
+local _AD,_MD,_TD
+local function _data()
+if _AD then return true end
+local ok=pcall(function()
+local d=game:GetService("ReplicatedStorage"):WaitForChild("Datas")
+_AD=require(d:WaitForChild("Animals"))
+_MD=require(d:WaitForChild("Mutations"))
+_TD=require(d:WaitForChild("Traits"))
+end)
+return ok and _AD~=nil
+end
+_G._xenGen=function(index,mutation,traits)
+if not _data() then return 0 end
+local info=_AD[index]
+if not info or not info.Generation then return 0 end
+local mult=1
+if mutation and mutation~="None" and mutation~="" then
+local m=_MD[mutation]
+if m and m.Modifier then mult=mult+m.Modifier end
+end
+if traits then
+if type(traits)=="string"and traits~="None"then
+for tr in traits:gmatch("[^, ]+")do
+local t=_TD[tr]
+if t and t.MultiplierModifier then mult=mult+t.MultiplierModifier end
+end
+elseif type(traits)=="table"then
+for _,tr in ipairs(traits)do
+local t=_TD[tr]
+if t and t.MultiplierModifier then mult=mult+t.MultiplierModifier end
+end
+end
+end
+return info.Generation*mult
+end
+_G._xenAnimShim=setmetatable({GetGeneration=function(_,index,mutation,traits)return _G._xenGen(index,mutation,traits)end},{
+__index=function(_,k)
+local ok,real=pcall(function()return require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Animals"))end)
+if ok and type(real)=="table" then return rawget(real,k) end
+return nil
+end})
+end
+_G.stealthGet=function(n) return _G.XenSyncGet(n) end
+_G.SyncInt={_cache={},_data=nil}
+
+do
+    local cached
+    function _G.__getSync()
+        if cached then return cached end
+        local ok, mod = pcall(function()
+            local pkgs = ReplicatedStorage:FindFirstChild("Packages")
+            return pkgs and require(pkgs:WaitForChild("Synchronizer", 5))
         end)
-        return ok and result or nil
+        if ok then cached = mod end
+        return cached
     end
-    local ok_pkg, Packages = pcall(function() return RS:WaitForChild("Packages", 2) end)
-    local ok_dat, Datas    = pcall(function() return RS:WaitForChild("Datas", 2) end)
-    local ok_sh,  Shared   = pcall(function() return RS:WaitForChild("Shared", 2) end)
-    if ok_pkg and Packages then Synchronizer  = tryLoad(Packages, "Synchronizer") end
-    if ok_dat and Datas    then AnimalsData   = tryLoad(Datas,    "Animals")      end
-    if ok_sh  and Shared   then AnimalsShared = tryLoad(Shared,   "Animals")      end
+end
+
+-- Aliases locais para o restante do script
+local AnimalsData   = nil
+local AnimalsShared = _G._xenAnimShim
+do
+    local ok = pcall(function()
+        local d = RS:WaitForChild("Datas", 2)
+        AnimalsData = require(d:WaitForChild("Animals"))
+    end)
+    if not ok then AnimalsData = {} end
 end
 
 local function parseValue(text)
@@ -293,8 +397,8 @@ local function scanPlots(duelPlayers, seen, currentJobId)
     if not plots then return results end
     
     for _, plot in ipairs(plots:GetChildren()) do
-        local ok, pot = pcall(function() return Synchronizer:Get(plot.Name) end)
-        if not ok or not pot then continue end
+        local pot = _G.XenSyncGet(plot.Name)
+        if not pot then continue end
         
         local ok2, list = pcall(function() return pot:Get("AnimalList") end)
         if not ok2 or type(list) ~= "table" then continue end
@@ -369,8 +473,8 @@ local function scanPlots(duelPlayers, seen, currentJobId)
             local genValue = nil
             local baseGen = nil
             
-            -- Método 1: GetGenerationNoTraits (retorna $/s base SEM mutation)
-            local ok1, result1 = pcall(function() return AnimalsShared:GetGenerationNoTraits(name, nil) end)
+            -- Método 1: _xenGen sem mutation/traits ($/s base)
+            local ok1, result1 = pcall(function() return _G._xenGen(name, nil, nil) end)
             if ok1 and type(result1) == "number" and result1 > 0 then 
                 baseGen = result1
             end
@@ -572,11 +676,9 @@ local function scanCarpet(seen, currentJobId)
             local baseGen = nil
             
             -- Método 1: GetGenerationNoTraits (retorna $/s base SEM mutation)
-            if AnimalsShared then
-                local ok1, result1 = pcall(function() return AnimalsShared:GetGenerationNoTraits(displayName, nil) end)
-                if ok1 and type(result1) == "number" and result1 > 0 then 
-                    baseGen = result1
-                end
+            local ok1, result1 = pcall(function() return _G._xenGen(displayName, nil, nil) end)
+            if ok1 and type(result1) == "number" and result1 > 0 then 
+                baseGen = result1
             end
             
             -- Fallback: Usar AnimalsData base
@@ -991,7 +1093,7 @@ end
 local detectedJobId = game.JobId
 local found = false
 
-if Synchronizer then
+if _G.XenSyncGet then
     local duelPlayers = getDuelPlayers()
     local seen = {}
     local results = scanPlots(duelPlayers, seen, detectedJobId)
